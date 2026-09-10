@@ -127,6 +127,8 @@ public class SimulateMatch {
         }
 
         if (params.containsKey("d")) {
+            // Commander-style formats set starting life from the player count.
+            final int playerCount = params.get("d").size();
             for (String deck : params.get("d")) {
                 Deck d = deckFromCommandLineParameter(deck, type);
                 if (d == null) {
@@ -147,6 +149,12 @@ public class SimulateMatch {
 
                 if (type.equals(GameType.Commander)) {
                     rp = RegisteredPlayer.forCommander(d);
+                } else if (type.getDeckFormat().hasCommander()) {
+                    // Brawl, ArenaBrawl, Oathbreaker and TinyLeaders all need their
+                    // commander moved to the command zone and their own starting life.
+                    // Without this they start at 20 with an empty command zone.
+                    rp = RegisteredPlayer.forVariants(playerCount, EnumSet.of(type), d,
+                            null, false, null, null);
                 } else {
                     rp = new RegisteredPlayer(d);
                 }
@@ -378,7 +386,7 @@ public class SimulateMatch {
     private static Deck deckFromCommandLineParameter(String deckname, GameType type) {
         int dotpos = deckname.lastIndexOf('.');
         if (dotpos > 0 && dotpos == deckname.length() - 4) {
-            String baseDir = type.equals(GameType.Commander) ?
+            String baseDir = type.getDeckFormat().hasCommander() ?
                     ForgeConstants.DECK_COMMANDER_DIR : ForgeConstants.DECK_CONSTRUCTED_DIR;
 
             File f = new File(baseDir + deckname);
@@ -392,7 +400,7 @@ public class SimulateMatch {
         IStorage<Deck> deckStore = null;
 
         // Add other game types here...
-        if (type.equals(GameType.Commander)) {
+        if (type.getDeckFormat().hasCommander()) {
             deckStore = FModel.getDecks().getCommander();
         } else {
             deckStore = FModel.getDecks().getConstructed();

@@ -76,6 +76,12 @@ public enum DeckFormat {
     Brawl      ( Range.is(59), Range.of(0, 15), 1, null,
             card -> StaticData.instance().getBrawlPredicate().test(card)
     ),
+    // MTG Arena's 100-card Brawl (99 + commander), as used by the Competitive Brawl
+    // queue. Distinct from paper Brawl above, which is 60 cards. Arena Brawl has no
+    // sideboard.
+    ArenaBrawl ( Range.is(99), Range.of(0, 0), 1, null,
+            card -> StaticData.instance().getBrawlPredicate().test(card)
+    ),
     TinyLeaders    ( Range.is(49),                         Range.of(0, 10), 1, new Predicate<>() {
         private final Set<String> bannedCards = ImmutableSet.of(
                 "Ancestral Recall", "Balance", "Black Lotus", "Black Vise", "Channel", "Chaos Orb", "Contract From Below", "Counterbalance", "Darkpact", "Demonic Attorney", "Demonic Tutor", "Earthcraft", "Edric, Spymaster of Trest", "Falling Star",
@@ -158,7 +164,8 @@ public enum DeckFormat {
     }
 
     public boolean hasCommander() {
-        return this == Commander || this == Oathbreaker || this == TinyLeaders || this == Brawl;
+        return this == Commander || this == Oathbreaker || this == TinyLeaders || this == Brawl
+                || this == ArenaBrawl;
     }
 
     public boolean hasSignatureSpell() {
@@ -620,6 +627,9 @@ public enum DeckFormat {
         }
         if (this == DeckFormat.Brawl) {
             return rules.canBeBrawlCommander();
+        }
+        if (this == DeckFormat.ArenaBrawl) {
+            return rules.canBeArenaBrawlCommander();
         }
         if (this == DeckFormat.TinyLeaders) {
             return rules.canBeTinyLeadersCommander();

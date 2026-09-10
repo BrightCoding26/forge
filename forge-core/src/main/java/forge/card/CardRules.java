@@ -409,6 +409,16 @@ public final class CardRules implements ICardCharacteristics {
         return false;
     }
 
+    public boolean canBeArenaBrawlCommander() {
+        CardType type = mainPart.getType();
+        if (!type.isLegendary()) {
+            return false;
+        }
+        // Arena's Competitive Brawl widened commander eligibility beyond creatures and
+        // planeswalkers to also allow legendary Vehicles and Spacecraft.
+        return canBeCreature() || type.isPlaneswalker() || type.isVehicle() || type.isSpacecraft();
+    }
+
     public boolean canBeTinyLeadersCommander() {
         CardType type = mainPart.getType();
         if (!type.isLegendary()) {

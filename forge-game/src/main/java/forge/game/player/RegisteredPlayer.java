@@ -171,6 +171,12 @@ public class RegisteredPlayer {
                 start.setStartingLife(start.getStartingLife() + 10);
             }
         }
+        if (appliedVariants.contains(GameType.ArenaBrawl)) {
+            start.commanders = deck.getCommanders();
+            // Arena Brawl is 25 life in one-on-one, matching paper Brawl. Commander
+            // damage does not apply, which Brawl rules already handle.
+            start.setStartingLife(start.getStartingLife() + 5);
+        }
     	if (appliedVariants.contains(GameType.Planechase)) {
             start.planes = planes;
     	}
