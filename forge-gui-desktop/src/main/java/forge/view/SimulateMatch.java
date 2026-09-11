@@ -83,6 +83,12 @@ public class SimulateMatch {
 
         boolean outputGamelog = !params.containsKey("q");
 
+        // Forge runs every -n game inside one Match, so from game 2 on the *loser* of the
+        // previous game takes the first turn. That makes games dependent on each other and
+        // pulls win rates toward parity. -alt instead alternates the starting seat strictly,
+        // which both restores independence and balances play/draw exactly.
+        boolean alternateStart = params.containsKey("alt");
+
         Long seed = null;
         if (params.containsKey("s")) {
             seed = Long.parseLong(params.get("s").get(0));
@@ -186,6 +192,9 @@ public class SimulateMatch {
             }
         } else {
             for (int iGame = 0; iGame < nGames; iGame++) {
+                if (alternateStart) {
+                    rules.setForcedFirstPlayerIndex(iGame % pp.size());
+                }
                 simulateSingleMatch(mc, iGame, outputGamelog);
             }
         }
@@ -205,6 +214,7 @@ public class SimulateMatch {
         System.out.println("\tP - Amount of players per match (used only with Tournaments, defaults to 2)");
         System.out.println("\tF - format of games, defaults to constructed");
         System.out.println("\tS - RNG seed for simulation");
+        System.out.println("	alt - alternate which player takes the first turn each game");
         System.out.println("\tA - AI profile per player, in the same order as the decks (e.g. -a Default Experimental)");
         System.out.println("\tc - Clock flag. Set the maximum time in seconds before calling the match a draw, defaults to 120.");
         System.out.println("\tq - Quiet flag. Output just the game result, not the entire game log.");

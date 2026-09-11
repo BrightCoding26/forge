@@ -18,12 +18,24 @@ public class GameRules {
     private boolean allowCheatShuffle = false;
     private final Set<GameType> appliedVariants = EnumSet.noneOf(GameType.class);
     private int simTimeout = 120;
+    // When set, this seat index takes the first turn instead of the result being decided
+    // by a coin toss or by Forge's "loser of the last game goes first" match rule. Used by
+    // simulation batches to balance play/draw exactly. Null leaves normal rules in force.
+    private Integer forcedFirstPlayerIndex = null;
 
     // it's a preference, not rule... but I could hardly find a better place for it
     private boolean useGrayText;
 
     // whether to warn about cards AI can't play well
     private boolean warnAboutAICards = true;
+
+    public Integer getForcedFirstPlayerIndex() {
+        return forcedFirstPlayerIndex;
+    }
+
+    public void setForcedFirstPlayerIndex(final Integer index) {
+        this.forcedFirstPlayerIndex = index;
+    }
 
     public GameRules(final GameType type) {
         this.gameType = type;

@@ -2399,6 +2399,14 @@ public class GameAction {
                 }
             }
         }
+        // A simulation batch can pin which seat starts, so play/draw can be balanced
+        // exactly across a run. Returns directly rather than calling chooseStartingPlayer,
+        // because the point is a deterministic assignment.
+        final Integer forcedFirst = game.getRules().getForcedFirstPlayerIndex();
+        if (forcedFirst != null && !game.getPlayers().isEmpty()) {
+            return game.getPlayers().get(forcedFirst % game.getPlayers().size());
+        }
+
         // Power Play - Each player with a Power Play in the CommandZone becomes the Starting Player
         Set<Player> powerPlayers = Sets.newHashSet();
         for (Card c : game.getCardsIn(ZoneType.Command)) {
