@@ -8,7 +8,9 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.time.StopWatch;
 
 import forge.LobbyPlayer;
+import forge.ai.AIOption;
 import forge.ai.AiProfileUtil;
+import forge.ai.LobbyPlayerAi;
 import forge.deck.Deck;
 import forge.deck.DeckGroup;
 import forge.deck.io.DeckSerializer;
@@ -100,6 +102,20 @@ public class SimulateMatch {
         // another, and each becomes individually reproducible.
         boolean perGameSeed = params.containsKey("pgs");
 
+        // Forge ships two AIs. The default is a heuristic cascade; forge.ai.simulation
+        // holds a look-ahead picker that copies the game state, plays each candidate
+        // ability into the copy and scores the result. Only the GUI could ever switch it
+        // on -- every createAiPlayer overload the sim entry point uses passes no AIOption,
+        // so batch simulation has always run the heuristic AI whatever else it was told.
+        //
+        // That matters most for the deck types Forge's own documentation calls its weak
+        // ones. Holding mana for an answer, or casting draw at end of turn, are plays the
+        // heuristic cascade cannot represent and a look-ahead evaluator can.
+        //
+        // It is not free: every decision copies and replays the game. Measure before
+        // trusting it on a budget.
+        boolean fullSimulationAi = params.containsKey("simai");
+
         Long seed = null;
         if (params.containsKey("s")) {
             seed = Long.parseLong(params.get("s").get(0));
@@ -175,7 +191,14 @@ public class SimulateMatch {
                 } else {
                     rp = new RegisteredPlayer(d);
                 }
-                rp.setPlayer(GamePlayerUtil.createAiPlayer(name, i - 1, profile));
+                LobbyPlayer lobbyPlayer = GamePlayerUtil.createAiPlayer(name, i - 1, profile);
+                if (fullSimulationAi && lobbyPlayer instanceof LobbyPlayerAi) {
+                    // Set after construction rather than passing options in: the overloads
+                    // that take an AIOption also draw a random sleeve index, and switching
+                    // to one would shift the RNG stream and every seeded game with it.
+                    ((LobbyPlayerAi) lobbyPlayer).setAiOption(AIOption.USE_FULL_SIMULATION);
+                }
+                rp.setPlayer(lobbyPlayer);
                 pp.add(rp);
                 i++;
             }
@@ -233,6 +256,7 @@ public class SimulateMatch {
         System.out.println("\tA - AI profile per player, in the same order as the decks (e.g. -a Default Experimental)");
         System.out.println("\tc - Clock flag. Set the maximum time in seconds before calling the match a draw, defaults to 120.");
         System.out.println("\tq - Quiet flag. Output just the game result, not the entire game log.");
+        System.out.println("	simai - Use the look-ahead simulation AI for every player instead of the heuristic one. Much slower.");
     }
 
     public static void simulateSingleMatch(final Match mc, int iGame, boolean outputGamelog) {

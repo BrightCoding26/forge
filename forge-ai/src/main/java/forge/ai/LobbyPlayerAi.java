@@ -22,6 +22,20 @@ public class LobbyPlayerAi extends LobbyPlayer implements IGameEntitiesFactory {
         }
     }
 
+    /**
+     * Choose the look-ahead AI after construction.
+     *
+     * The constructor is the only other way in, and the headless `sim` entry point builds
+     * its players through GamePlayerUtil.createAiPlayer overloads that pass no options at
+     * all -- so the simulation AI was unreachable from batch simulation. Setting it here
+     * instead of adding another createAiPlayer overload keeps the RNG untouched: those
+     * overloads draw a random sleeve index from MyRandom, and changing which one is called
+     * would shift every seeded game.
+     */
+    public void setAiOption(AIOption option) {
+        this.option = option;
+    }
+
     public void setAiProfile(String profileName) {
         Logger.debug("[AI Preferences] " + name + " using profile " + profileName);
         aiProfile = profileName;
