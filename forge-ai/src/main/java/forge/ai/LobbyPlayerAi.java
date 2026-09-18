@@ -14,6 +14,7 @@ public class LobbyPlayerAi extends LobbyPlayer implements IGameEntitiesFactory {
     private String aiProfile = "";
     private boolean rotateProfileEachGame;
     private AIOption option;
+    private boolean playUnsupportedCards;
 
     public LobbyPlayerAi(String name, Set<AIOption> options) {
         super(name);
@@ -36,6 +37,11 @@ public class LobbyPlayerAi extends LobbyPlayer implements IGameEntitiesFactory {
         this.option = option;
     }
 
+    /** Let this AI cast cards marked AI:RemoveDeck:All. See AiController#setPlayUnsupportedCards. */
+    public void setPlayUnsupportedCards(boolean value) {
+        this.playUnsupportedCards = value;
+    }
+
     public void setAiProfile(String profileName) {
         Logger.debug("[AI Preferences] " + name + " using profile " + profileName);
         aiProfile = profileName;
@@ -51,6 +57,7 @@ public class LobbyPlayerAi extends LobbyPlayer implements IGameEntitiesFactory {
     private PlayerControllerAi createControllerFor(Player ai) {
         PlayerControllerAi result = new PlayerControllerAi(ai.getGame(), ai, this);
         result.getAi().setUseSimulation(option);
+        result.getAi().setPlayUnsupportedCards(playUnsupportedCards);
         return result;
     }
 

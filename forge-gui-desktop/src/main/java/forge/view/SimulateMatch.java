@@ -116,6 +116,15 @@ public class SimulateMatch {
         // trusting it on a budget.
         boolean fullSimulationAi = params.containsKey("simai");
 
+        // Let the AI cast cards marked AI:RemoveDeck:All instead of skipping them entirely.
+        //
+        // The annotation is mostly a deckbuilding hint, but AiController also applies it when
+        // choosing what to play, so such a card in a supplied decklist is never cast at all --
+        // 321 of them are Brawl-legal on Arena, including all ten Signets. Off by default
+        // because those cards are annotated for a reason; turn it on to measure whether the
+        // ban is earning its keep for a given deck.
+        boolean playUnsupportedCards = params.containsKey("simunsupported");
+
         Long seed = null;
         if (params.containsKey("s")) {
             seed = Long.parseLong(params.get("s").get(0));
@@ -192,11 +201,16 @@ public class SimulateMatch {
                     rp = new RegisteredPlayer(d);
                 }
                 LobbyPlayer lobbyPlayer = GamePlayerUtil.createAiPlayer(name, i - 1, profile);
-                if (fullSimulationAi && lobbyPlayer instanceof LobbyPlayerAi) {
+                if (lobbyPlayer instanceof LobbyPlayerAi) {
                     // Set after construction rather than passing options in: the overloads
                     // that take an AIOption also draw a random sleeve index, and switching
                     // to one would shift the RNG stream and every seeded game with it.
-                    ((LobbyPlayerAi) lobbyPlayer).setAiOption(AIOption.USE_FULL_SIMULATION);
+                    if (fullSimulationAi) {
+                        ((LobbyPlayerAi) lobbyPlayer).setAiOption(AIOption.USE_FULL_SIMULATION);
+                    }
+                    if (playUnsupportedCards) {
+                        ((LobbyPlayerAi) lobbyPlayer).setPlayUnsupportedCards(true);
+                    }
                 }
                 rp.setPlayer(lobbyPlayer);
                 pp.add(rp);
@@ -257,6 +271,7 @@ public class SimulateMatch {
         System.out.println("\tc - Clock flag. Set the maximum time in seconds before calling the match a draw, defaults to 120.");
         System.out.println("\tq - Quiet flag. Output just the game result, not the entire game log.");
         System.out.println("	simai - Use the look-ahead simulation AI for every player instead of the heuristic one. Much slower.");
+        System.out.println("	simunsupported - Let the AI cast cards marked AI:RemoveDeck:All instead of never playing them.");
     }
 
     public static void simulateSingleMatch(final Match mc, int iGame, boolean outputGamelog) {

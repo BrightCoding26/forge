@@ -100,6 +100,7 @@ public class AiController {
     private boolean useLivingEnd;
     private List<SpellAbility> skipped;
     private volatile boolean timeoutReached;
+    private boolean playUnsupportedCards;
 
     public AiController(final Player computerPlayer, final Game game0) {
         player = computerPlayer;
@@ -116,6 +117,21 @@ public class AiController {
     }
     public void setUseSimulation(AIOption mode) {
         simMode = mode;
+    }
+
+    /**
+     * Whether to consider cards marked AI:RemoveDeck:All when choosing what to play.
+     *
+     * Off by default, which is the historical behaviour: those cards are stripped from the
+     * candidate list in getSpellAbilityToPlay and so are never cast at all. Deliberately not
+     * an AIOption -- that enum is stored in a single field driving usesFullSimulation(), and
+     * this setting is orthogonal to which picker is in use.
+     */
+    public boolean playsUnsupportedCards() {
+        return playUnsupportedCards;
+    }
+    public void setPlayUnsupportedCards(boolean value) {
+        playUnsupportedCards = value;
     }
 
     public int getAttackAggression() {
@@ -1568,8 +1584,21 @@ public class AiController {
 
         saList.removeIf(spellAbility -> {
             // don't include removedAI cards if somehow the AI can play the ability or gain control of unsupported card
-            // TODO allow when experimental profile?
-            return spellAbility.isLandAbility() || (spellAbility.getHostCard() != null && ComputerUtilCard.isCardRemAIDeck(spellAbility.getHostCard()));
+            // (answering the former TODO here: setPlayUnsupportedCards is that opt-in.)
+            //
+            // AI:RemoveDeck:All is primarily a *deckbuilding* hint -- it keeps cards Forge's
+            // deck generator handles poorly out of generated decks. Applying it here also bans
+            // them from being cast at all, which matters for a human-supplied decklist that
+            // contains one: the card sits in the library for the whole game. All ten Signets
+            // carry the annotation, so a multicolour Commander list can lose several slots to
+            // it. ComputerUtilAbility.getSpellAbilityPriority already penalises these by 10,
+            // so when they are allowed through they sort last and get cast only when there is
+            // nothing better to do -- which is the right default for a mana rock.
+            if (spellAbility.isLandAbility()) {
+                return true;
+            }
+            return !playUnsupportedCards && spellAbility.getHostCard() != null
+                    && ComputerUtilCard.isCardRemAIDeck(spellAbility.getHostCard());
         });
         //removed skipped SA
         skipped = saList.stream().filter(SpellAbility::isSkip).collect(Collectors.toList());
