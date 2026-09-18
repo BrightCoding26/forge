@@ -356,6 +356,14 @@ public class ComputerUtilAbility {
                 if (source.isCreature()) {
                     p += 1;
                 }
+                // Kept unconditional, including under setPlayUnsupportedCards, because
+                // lifting it was measured and bought nothing. Casting these at normal
+                // priority did move the timing -- turn-2 casts of a mana rock rose 112 to
+                // 145 and the mean cast turn fell from 4.70 to 4.54 -- but the win rate was
+                // identical over 600 paired shuffles (84/600 both ways, delta +0.00pp,
+                // 95% CI [-2.12, +2.12]). With no benefit to show, the penalty stays: it is
+                // the conservative setting for the ~310 annotated cards that are *not* mana
+                // rocks and were not part of that test.
                 if (ComputerUtilCard.isCardRemAIDeck(sa.getOriginalHost() != null ? sa.getOriginalHost() : source)) {
                     p -= 10;
                 }
