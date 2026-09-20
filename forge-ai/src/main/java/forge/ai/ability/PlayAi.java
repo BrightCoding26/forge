@@ -34,6 +34,13 @@ public class PlayAi extends SpellAbilityAi {
         final Card source = sa.getHostCard();
         // don't use this as a response (ReplaySpell logic is an exception, might be called from a subability
         // while the trigger is on stack)
+        //
+        // Tried and reverted: also exempting `sa.getRootAbility().isTrigger()`, on the theory
+        // that a Play resolving inside a trigger is not a response. It changed nothing --
+        // Gandalf, Party Guest's free casts were identical, 5 of 28 triggers before and
+        // after over the same twelve seeded games -- because the trigger is already off the
+        // stack by the time its sub-ability runs. See the note in chooseSingleCard for where
+        // the real constraint turned out to be.
         if (!game.getStack().isEmpty() && !"ReplaySpell".equals(logic)) {
             return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
@@ -196,7 +203,23 @@ public class PlayAi extends SpellAbilityAi {
 
                     spell = (Spell) spell.copyWithManaCostReplaced(spell.getActivatingPlayer(), abCost);
                 }
-                if (AiPlayDecision.WillPlay == ((PlayerControllerAi)ai.getController()).getAi().canPlayFromEffectAI(spell, !(isOptional || sa.hasParam("Optional")), true)) {
+                // -Dforge.debugPlayAi=1 prints what each Play effect was offered and what it
+                // decided. Worth keeping: the two obvious explanations for a card like
+                // Gandalf, Party Guest rarely firing -- the AI refusing to respond while the
+                // stack is busy, and the AI judging a free spell by the bar it uses for one
+                // it is paying for -- were both wrong, and both were only ruled out by
+                // reading this. The answer was that the AI is usually offered *nothing*.
+                //
+                // Tried and reverted alongside it: treating a free cast from a trigger as
+                // mandatory. That made it slightly worse, 4 of 28 against 5, so the
+                // permissiveness was not the constraint either.
+                AiPlayDecision freeCastDecision = ((PlayerControllerAi)ai.getController())
+                        .getAi().canPlayFromEffectAI(spell, !(isOptional || sa.hasParam("Optional")), true);
+                if (System.getProperty("forge.debugPlayAi") != null) {
+                    System.out.println("PlayAiDebug: " + sa.getHostCard() + " considering "
+                            + c.getName() + " -> " + freeCastDecision);
+                }
+                if (AiPlayDecision.WillPlay == freeCastDecision) {
                     // Before accepting, see if the spell has a valid number of targets (it should at this point).
                     // Proceeding past this point if the spell is not correctly targeted will result
                     // in "Failed to add to stack" error and the card disappearing from the game completely.
@@ -214,6 +237,14 @@ public class PlayAi extends SpellAbilityAi {
             options.forEach(c -> c.changeToState(CardStateName.Original));
         }
 
+        if (System.getProperty("forge.debugPlayAi") != null) {
+            int offered = 0;
+            for (Card ignored : options) {
+                offered++;
+            }
+            System.out.println("PlayAiDebug: offered " + offered + " card(s), "
+                    + tgtCards.size() + " acceptable, for " + sa.getHostCard());
+        }
         final Card best = ComputerUtilCard.getBestAI(tgtCards);
         if (sa.usesTargeting() && !sa.isTargetNumberValid()) {
             sa.getTargets().add(best);
