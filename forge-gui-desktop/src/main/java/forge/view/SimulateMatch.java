@@ -125,6 +125,11 @@ public class SimulateMatch {
         // ban is earning its keep for a given deck.
         boolean playUnsupportedCards = params.containsKey("simunsupported");
 
+        // Correct five AI checks that veto a spell on an evaluation made with inputs that do
+        // not exist yet, so the card is never cast -- see AiController#setFixCastVetoes. Off
+        // by default so that runs made without it can be reproduced.
+        boolean fixCastVetoes = params.containsKey("simvetofix");
+
         Long seed = null;
         if (params.containsKey("s")) {
             seed = Long.parseLong(params.get("s").get(0));
@@ -211,6 +216,9 @@ public class SimulateMatch {
                     if (playUnsupportedCards) {
                         ((LobbyPlayerAi) lobbyPlayer).setPlayUnsupportedCards(true);
                     }
+                    if (fixCastVetoes) {
+                        ((LobbyPlayerAi) lobbyPlayer).setFixCastVetoes(true);
+                    }
                 }
                 rp.setPlayer(lobbyPlayer);
                 pp.add(rp);
@@ -272,6 +280,7 @@ public class SimulateMatch {
         System.out.println("\tq - Quiet flag. Output just the game result, not the entire game log.");
         System.out.println("	simai - Use the look-ahead simulation AI for every player instead of the heuristic one. Much slower.");
         System.out.println("	simunsupported - Let the AI cast cards marked AI:RemoveDeck:All instead of never playing them.");
+        System.out.println("	simvetofix - Correct the AI checks that veto a cast on inputs that do not exist yet (see AiController).");
     }
 
     public static void simulateSingleMatch(final Match mc, int iGame, boolean outputGamelog) {

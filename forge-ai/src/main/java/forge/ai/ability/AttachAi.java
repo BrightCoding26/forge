@@ -972,6 +972,12 @@ public class AttachAi extends SpellAbilityAi {
             && sa.getParent().getApi() == ApiType.Token && sa.getParent().hasParam("RememberTokens")) {
             // Living Weapon or similar
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        } else if ("Remembered".equals(sa.getParam("Defined")) && sa.getParent() != null
+            && sa.getParent().getApi() == ApiType.Amass && sa.getParent().hasParam("RememberAmass")
+            && AiController.fixesCastVetoes(ai)) {
+            // The same thing for an Amass: Goblin Plate Mail attaches to the Army it just made or
+            // grew. Nothing is remembered until then, so falling through vetoed the cast.
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
         return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }

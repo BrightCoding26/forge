@@ -15,6 +15,7 @@ public class LobbyPlayerAi extends LobbyPlayer implements IGameEntitiesFactory {
     private boolean rotateProfileEachGame;
     private AIOption option;
     private boolean playUnsupportedCards;
+    private boolean fixCastVetoes;
 
     public LobbyPlayerAi(String name, Set<AIOption> options) {
         super(name);
@@ -42,6 +43,11 @@ public class LobbyPlayerAi extends LobbyPlayer implements IGameEntitiesFactory {
         this.playUnsupportedCards = value;
     }
 
+    /** Correct the AI checks that veto a cast wrongly. See AiController#setFixCastVetoes. */
+    public void setFixCastVetoes(boolean value) {
+        this.fixCastVetoes = value;
+    }
+
     public void setAiProfile(String profileName) {
         Logger.debug("[AI Preferences] " + name + " using profile " + profileName);
         aiProfile = profileName;
@@ -58,6 +64,7 @@ public class LobbyPlayerAi extends LobbyPlayer implements IGameEntitiesFactory {
         PlayerControllerAi result = new PlayerControllerAi(ai.getGame(), ai, this);
         result.getAi().setUseSimulation(option);
         result.getAi().setPlayUnsupportedCards(playUnsupportedCards);
+        result.getAi().setFixCastVetoes(fixCastVetoes);
         return result;
     }
 

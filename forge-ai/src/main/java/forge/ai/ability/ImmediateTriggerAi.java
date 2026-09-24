@@ -23,16 +23,25 @@ public class ImmediateTriggerAi extends SpellAbilityAi {
 
         trigsa.setActivatingPlayer(ai);
 
+        AiAbilityDecision result;
         if (trigsa instanceof AbilitySub) {
-            return SpellApiToAi.Converter.get(trigsa).chkDrawbackWithSubs(ai, (AbilitySub)trigsa);
+            result = SpellApiToAi.Converter.get(trigsa).chkDrawbackWithSubs(ai, (AbilitySub)trigsa);
+        } else {
+            AiPlayDecision decision = ((PlayerControllerAi)ai.getController()).getAi().canPlaySa(trigsa);
+            result = decision == AiPlayDecision.WillPlay ? new AiAbilityDecision(100, decision)
+                    : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
-        AiPlayDecision decision = ((PlayerControllerAi)ai.getController()).getAi().canPlaySa(trigsa);
-        if (decision == AiPlayDecision.WillPlay) {
-            return new AiAbilityDecision(100, decision);
+        // A reflexive trigger that remembers what its parent did -- "amass Orcs 2. When you do,
+        // deal X damage, where X is the amassed Army's power" -- cannot be judged yet: nothing
+        // has been remembered, so X reads 0 and the Execute finds no target. That refusal
+        // vetoed Foray of Orcs and Grishnakh on every decision. Defer instead; the AI chooses
+        // for real when the trigger fires, and a mandatory one with no target simply fizzles.
+        if (!result.willingToPlay() && AiController.fixesCastVetoes(ai)
+                && (sa.hasParam("RememberObjects") || sa.hasParam("RememberSVarAmount"))) {
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
-
-        return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+        return result;
     }
 
     @Override

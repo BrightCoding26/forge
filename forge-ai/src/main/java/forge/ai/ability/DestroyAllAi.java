@@ -33,6 +33,18 @@ public class DestroyAllAi extends SpellAbilityAi {
 
     @Override
     public AiAbilityDecision chkDrawback(Player aiPlayer, SpellAbility sa) {
+        // A rider scoped to the parent's target -- Fires of Mount Doom's "destroy all Equipment
+        // attached to that creature" -- usually has nothing to destroy, and doMassRemovalLogic
+        // refuses whenever no opposing permanent qualifies. That vetoed the parent every time
+        // it had a target. A rider that destroys nothing costs nothing. Riders only: a wipe
+        // riding on an energy payment or a sacrifice is the point of its card, and holding it
+        // for an empty board is still right.
+        final String valid = sa.getParamOrDefault("ValidCards", "");
+        if (valid.contains("Targeted") && AiController.fixesCastVetoes(aiPlayer)
+                && CardLists.getValidCards(aiPlayer.getGame().getCardsIn(ZoneType.Battlefield), valid,
+                        aiPlayer, sa.getHostCard(), sa).isEmpty()) {
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
         return doMassRemovalLogic(aiPlayer, sa);
     }
 

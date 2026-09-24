@@ -56,6 +56,7 @@ public abstract class SpellAbilityAi extends SpellAbilityEffect {
     public final AiAbilityDecision canPlayWithSubs(final Player aiPlayer, final SpellAbility sa) {
         AiAbilityDecision decision = canPlay(aiPlayer, sa);
         if (!decision.willingToPlay() && !"PlayForSub".equals(sa.getParam("AILogic"))) {
+            traceRefusal("", sa, decision);
             return decision;
         }
         final AbilitySub subAb = sa.getSubAbility();
@@ -190,10 +191,19 @@ public abstract class SpellAbilityAi extends SpellAbilityEffect {
         return doTriggerNoCostWithSubs(aiPlayer, sa, mandatory).willingToPlay();
     }
 
+    /** See AiController.DEBUG_CAST_AI. */
+    private static void traceRefusal(String what, SpellAbility sa, AiAbilityDecision decision) {
+        if (AiController.DEBUG_CAST_AI) {
+            System.out.println("CastAiDebug:   " + sa.getHostCard().getName() + ": " + what + sa.getApi()
+                    + " refused (" + decision.decision() + ")");
+        }
+    }
+
     public final AiAbilityDecision doTriggerNoCostWithSubs(final Player aiPlayer, final SpellAbility sa, final boolean mandatory) {
         AiAbilityDecision decision = doTriggerNoCost(aiPlayer, sa, mandatory);
 
         if (!decision.willingToPlay() && !"Always".equals(sa.getParam("AILogic"))) {
+            traceRefusal("trigger ", sa, decision);
             return decision;
         }
 
@@ -270,6 +280,7 @@ public abstract class SpellAbilityAi extends SpellAbilityEffect {
         final AbilitySub subAb = ab.getSubAbility();
         AiAbilityDecision decision = SpellApiToAi.Converter.get(ab).chkDrawback(aiPlayer, ab);
         if (!decision.willingToPlay()) {
+            traceRefusal("sub-ability ", ab, decision);
             return decision;
         }
 

@@ -25,6 +25,22 @@ import java.util.*;
 
 public class PumpAi extends PumpAiBase {
 
+    /**
+     * The keywords a pump grants. KWChoice$ ("your choice of lifelink or indestructible") was
+     * read as granting nothing, so Orcish Medicine never found a creature worth targeting.
+     * With the veto fix every option is weighed; PlayerControllerAi.chooseKeywordForPump
+     * picks one at resolution.
+     */
+    private static List<String> pumpKeywords(final Player ai, final SpellAbility sa) {
+        if (sa.hasParam("KW")) {
+            return Arrays.asList(sa.getParam("KW").split(" & "));
+        }
+        if (sa.hasParam("KWChoice") && AiController.fixesCastVetoes(ai)) {
+            return Arrays.asList(sa.getParam("KWChoice").split(","));
+        }
+        return Lists.newArrayList();
+    }
+
     @Override
     protected boolean checkAiLogic(final Player ai, final SpellAbility sa, final String aiLogic) {
         if ("MoveCounter".equals(aiLogic)) {
@@ -119,8 +135,7 @@ public class PumpAi extends PumpAiBase {
         final Game game = ai.getGame();
         final Card source = sa.getHostCard();
         final SpellAbility root = sa.getRootAbility();
-        final List<String> keywords = sa.hasParam("KW") ? Arrays.asList(sa.getParam("KW").split(" & "))
-                : Lists.newArrayList();
+        final List<String> keywords = pumpKeywords(ai, sa);
         final String numDefense = sa.getParamOrDefault("NumDef", "");
         final String numAttack = sa.getParamOrDefault("NumAtt", "");
 
@@ -354,8 +369,7 @@ public class PumpAi extends PumpAiBase {
 
     private boolean pumpTgtAI(final Player ai, final SpellAbility sa, final int defense, final int attack, final boolean mandatory,
                               boolean immediately) {
-        final List<String> keywords = sa.hasParam("KW") ? Arrays.asList(sa.getParam("KW").split(" & "))
-                : Lists.newArrayList();
+        final List<String> keywords = pumpKeywords(ai, sa);
         final Game game = ai.getGame();
         final Card source = sa.getHostCard();
         final boolean isFight = "Fight".equals(sa.getParam("AILogic")) || "PowerDmg".equals(sa.getParam("AILogic"));
@@ -641,6 +655,14 @@ public class PumpAi extends PumpAiBase {
 
         if (!sa.usesTargeting()) {
             if (mandatory) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            // Pumping yourself -- A-The One Ring's "you gain protection from everything" -- is
+            // never a cost. AiController.checkETBEffects asks every mandatory ETB trigger
+            // whether the AI would choose it, and refusing here vetoed the Ring in every game
+            // on record. Narrowed to the player on purpose: untargeted pumps of cards
+            // (Defined$ Self, Enchanted) take this same branch and are left as they were.
+            if ("You".equals(sa.getParam("Defined")) && !sa.isCurse() && AiController.fixesCastVetoes(ai)) {
                 return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
             }
             return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);

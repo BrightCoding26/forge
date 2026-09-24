@@ -101,6 +101,16 @@ public class AiController {
     private List<SpellAbility> skipped;
     private volatile boolean timeoutReached;
     private boolean playUnsupportedCards;
+    private boolean fixCastVetoes;
+
+    /**
+     * -Dforge.debugCastAi=1 prints every spell the AI considered casting and turned down,
+     * with the reason, and under it the ability, sub-ability or ETB trigger that refused.
+     * A spell is vetoed whole if any link in its chain refuses, and nothing else records
+     * which link that was -- a card that is never cast looks the same in the game log
+     * whether it is a bad card or a bad check.
+     */
+    public static final boolean DEBUG_CAST_AI = System.getProperty("forge.debugCastAi") != null;
 
     public AiController(final Player computerPlayer, final Game game0) {
         player = computerPlayer;
@@ -132,6 +142,33 @@ public class AiController {
     }
     public void setPlayUnsupportedCards(boolean value) {
         playUnsupportedCards = value;
+    }
+
+    /**
+     * Whether to correct five checks that veto a spell on an evaluation that cannot be right
+     * at decision time. Each vetoed its card outright -- Foray of Orcs, Grishnakh, Goblin
+     * Plate Mail, Fires of Mount Doom, A-The One Ring and Orcish Medicine were cast 0 times
+     * in 400 games -- and A-The One Ring 0 times in every run on record, in three gauntlet
+     * decks. The checks, all gated on this:
+     *
+     *   ImmediateTriggerAi  a reflexive trigger judged before its parent has remembered anything
+     *   AttachAi            attaching to the Army an Amass just made or grew
+     *   DestroyAllAi        a rider scoped to the parent's target that has nothing to destroy
+     *   PumpAi              "you gain protection from everything" as an ETB trigger
+     *   PumpAi              "your choice of X or Y" read as granting nothing
+     *
+     * Off by default, which is the historical behaviour, so runs made without it stay
+     * reproducible. Like playUnsupportedCards, not an AIOption.
+     */
+    public boolean fixesCastVetoes() {
+        return fixCastVetoes;
+    }
+    public void setFixCastVetoes(boolean value) {
+        fixCastVetoes = value;
+    }
+    /** For ability AIs, which see only the player. False for anything not AI-controlled. */
+    public static boolean fixesCastVetoes(Player ai) {
+        return ai.getController() instanceof PlayerControllerAi pc && pc.getAi().fixCastVetoes;
     }
 
     public int getAttackAggression() {
@@ -380,6 +417,9 @@ public class AiController {
                         (ComputerUtil.aiLifeInDanger(activator, true, 0) || "BadETB".equals(tr.getParam("AILogic")))) {
                     // trigger will not run due to lack of targets and we 1. desperately need a creature or 2. are happy about that
                     continue;
+                }
+                if (DEBUG_CAST_AI) {
+                    System.out.println("CastAiDebug:   ETB veto on " + card.getName() + ": " + exSA.getApi() + " trigger refused");
                 }
                 return false;
             }
@@ -1703,8 +1743,11 @@ public class AiController {
 
                 // reset LastStateBattlefield
                 sa.clearLastState();
-                // PhaseHandler ph = game.getPhaseHandler();
-                // System.out.printf("Ai thinks '%s' of %s -> %s @ %s %s >>> \n", opinion, sa.getHostCard(), sa, Lang.getInstance().getPossesive(ph.getPlayerTurn().getName()), ph.getPhase());
+                if (DEBUG_CAST_AI && root.isSpell() && opinion != AiPlayDecision.WillPlay) {
+                    System.out.println("CastAiDebug: T" + game.getPhaseHandler().getTurn() + " "
+                            + game.getPhaseHandler().getPhase() + " " + player.getName()
+                            + " declines " + sa.getHostCard().getName() + " -> " + opinion);
+                }
 
                 if (opinion != AiPlayDecision.WillPlay) {
                     continue;
