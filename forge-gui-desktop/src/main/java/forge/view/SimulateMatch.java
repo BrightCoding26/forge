@@ -125,7 +125,7 @@ public class SimulateMatch {
         // ban is earning its keep for a given deck.
         boolean playUnsupportedCards = params.containsKey("simunsupported");
 
-        // Correct five AI checks that veto a spell on an evaluation made with inputs that do
+        // Correct the AI checks that veto a spell on an evaluation made with inputs that do
         // not exist yet, so the card is never cast -- see AiController#setFixCastVetoes. Off
         // by default so that runs made without it can be reproduced.
         boolean fixCastVetoes = params.containsKey("simvetofix");

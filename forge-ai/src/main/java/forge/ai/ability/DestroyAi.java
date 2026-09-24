@@ -23,7 +23,39 @@ public class DestroyAi extends SpellAbilityAi {
 
     @Override
     public AiAbilityDecision chkDrawback(Player ai, SpellAbility sa) {
+        // The Black Arrow: "it deals 1 damage to any target. If a Dragon is dealt damage this
+        // way, destroy it." The destroy names what the damage remembers, and nothing is
+        // remembered until the damage resolves, so checkApiLogic found an empty Defined list,
+        // refused, and checkETBEffects vetoed the Arrow on every decision. Judge what will be
+        // remembered instead: the parent's targets. Destroying none of the AI's own cards costs
+        // it nothing, even when it destroys nothing at all; the parent decides the cast.
+        if (AiController.fixesCastVetoes(ai)) {
+            final CardCollection remembered = predictRememberedTargets(sa);
+            if (remembered != null && CardLists.filterControlledBy(remembered, ai).isEmpty()) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+        }
         return checkApiLogic(ai, sa);
+    }
+
+    /**
+     * The cards a Defined$ Remembered will name, when nothing is remembered yet and a link above
+     * it will remember its own targets as it resolves -- RememberDamaged (The Black Arrow, Silver
+     * Bolt) or RememberObjects$ Targeted (Ride Down). Null for any other shape. Reads targets
+     * the parent's AI has already chosen; draws nothing from the RNG.
+     */
+    private static CardCollection predictRememberedTargets(final SpellAbility sa) {
+        if (!"Remembered".equals(sa.getParam("Defined"))
+                || !AbilityUtils.getDefinedCards(sa.getHostCard(), "Remembered", sa).isEmpty()) {
+            return null;
+        }
+        for (SpellAbility p = sa.getParent(); p != null; p = p.getParent()) {
+            if (p.usesTargeting()
+                    && (p.hasParam("RememberDamaged") || "Targeted".equals(p.getParam("RememberObjects")))) {
+                return new CardCollection(p.getTargets().getTargetCards());
+            }
+        }
+        return null;
     }
 
     @Override

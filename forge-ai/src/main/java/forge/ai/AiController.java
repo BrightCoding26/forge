@@ -145,16 +145,17 @@ public class AiController {
     }
 
     /**
-     * Whether to correct six checks that veto a spell on an evaluation that cannot be right
+     * Whether to correct seven checks that veto a spell on an evaluation that cannot be right
      * at decision time. Each vetoed its card outright -- Foray of Orcs, Grishnakh, Goblin
-     * Plate Mail, Fires of Mount Doom, A-The One Ring and Orcish Medicine were cast 0 times
-     * in 400 games -- and A-The One Ring and Sundering Titan 0 times in every run on record.
-     * The checks, all gated on this:
+     * Plate Mail, Fires of Mount Doom, A-The One Ring, Orcish Medicine and The Black Arrow
+     * were cast 0 times in diagnostics runs -- and A-The One Ring and Sundering Titan 0 times
+     * in every run on record. The checks, all gated on this:
      *
      *   ImmediateTriggerAi  a reflexive trigger judged before its parent has remembered anything
      *   AttachAi            attaching to the Army an Amass just made or grew
      *   DestroyAllAi        a rider scoped to the parent's target that has nothing to destroy
      *   DestroyAllAi        destroying what a ChooseCard parent has not chosen yet
+     *   DestroyAi           destroying what a damaging or targeting parent has not remembered yet
      *   PumpAi              "you gain protection from everything" as an ETB trigger
      *   PumpAi              "your choice of X or Y" read as granting nothing
      *
