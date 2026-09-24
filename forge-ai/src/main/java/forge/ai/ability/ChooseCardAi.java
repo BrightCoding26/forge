@@ -3,7 +3,9 @@ package forge.ai.ability;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import forge.ai.*;
+import forge.card.CardType;
 import forge.game.Game;
+import forge.game.ability.ApiType;
 import forge.game.card.*;
 import forge.game.combat.Combat;
 import forge.game.keyword.Keyword;
@@ -141,6 +143,48 @@ public class ChooseCardAi extends SpellAbilityAi {
         return checkApiLogic(ai, sa);
     }
 
+    /** Sundering Titan's shape: you choose a land of each basic type, then destroy those lands. */
+    private static boolean destroysEachBasicTypeChoice(SpellAbility sa) {
+        final SpellAbility sub = sa.getSubAbility();
+        return sa.getApi() == ApiType.ChooseCard && sa.hasParam("EachBasicType") && !sa.hasParam("AILogic")
+                && "You".equals(sa.getParamOrDefault("Defined", "You"))
+                && sub != null && sub.getApi() == ApiType.DestroyAll
+                && "Card.ChosenCard".equals(sub.getParam("ValidCards"));
+    }
+
+    /**
+     * What a DestroyAll of Card.ChosenCard will destroy once its parent, a still unresolved
+     * ChooseCard of that shape, has chosen for the AI; null for any other DestroyAll. It says
+     * only whose land each basic type costs, which is exact because chooseSingleCard then
+     * prefers an opponent's. Which of theirs can be random, and drawing from the RNG while
+     * merely deciding would move the rest of the game.
+     */
+    public static CardCollection predictDestroyedChoice(Player ai, SpellAbility destroyAll) {
+        final SpellAbility choose = destroyAll.getParent();
+        if (choose == null || choose.getSubAbility() != destroyAll || !destroysEachBasicTypeChoice(choose)
+                || !ai.equals(choose.getActivatingPlayer())) {
+            return null;
+        }
+        final Card host = choose.getHostCard();
+        CardCollectionView choices = ai.getGame().getCardsIn(choose.hasParam("ChoiceZone")
+                ? ZoneType.listValueOf(choose.getParam("ChoiceZone")) : Lists.newArrayList(ZoneType.Battlefield));
+        if (choose.hasParam("Choices")) {
+            choices = CardLists.getValidCards(choices, choose.getParam("Choices"), ai, host, choose);
+        }
+        final CardCollection destroyed = new CardCollection();
+        for (final String type : CardType.getBasicTypes()) {
+            final CardCollection ofType = CardLists.getType(choices, type);
+            final CardCollection theirs = CardLists.filterControlledBy(ofType, ai.getOpponents());
+            final CardCollection mine = CardLists.filterControlledBy(ofType, ai);
+            if (!theirs.isEmpty()) {
+                destroyed.add(theirs.getFirst());
+            } else if (!mine.isEmpty()) {
+                destroyed.add(mine.getFirst());
+            }
+        }
+        return destroyed;
+    }
+
     /* (non-Javadoc)
      * @see forge.card.ability.SpellAbilityAi#chooseSingleCard(forge.card.spellability.SpellAbility, java.util.List, boolean)
      */
@@ -156,6 +200,11 @@ public class ChooseCardAi extends SpellAbilityAi {
             }
             options = opt;
             logic = logic.replace("NotSelf", "");
+        }
+        // The base logic takes the best land of the type whoever controls it, which can be the
+        // AI's own, though what is chosen here is destroyed. predictDestroyedChoice relies on this.
+        if (logic.isEmpty() && destroysEachBasicTypeChoice(sa) && AiController.fixesCastVetoes(ai)) {
+            logic = "OppPreferred";
         }
         Card choice = null;
         if (logic.isEmpty()) {

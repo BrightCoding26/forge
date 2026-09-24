@@ -45,6 +45,20 @@ public class DestroyAllAi extends SpellAbilityAi {
                         aiPlayer, sa.getHostCard(), sa).isEmpty()) {
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
+        // Sundering Titan destroys what its ChooseCard parent chose, and nothing is chosen
+        // until the parent resolves, so doMassRemovalLogic always found nothing to destroy
+        // and checkETBEffects vetoed the Titan: 0 casts in every run on record. Judge the
+        // choice the AI will make instead. Destroying only opponents' lands costs the AI
+        // nothing, even when there are none to destroy; losing its own is judged as before.
+        if (AiController.fixesCastVetoes(aiPlayer)) {
+            final CardCollection chosen = ChooseCardAi.predictDestroyedChoice(aiPlayer, sa);
+            if (chosen != null) {
+                if (!chosen.anyMatch(CardPredicates.isController(aiPlayer))) {
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+                }
+                return doMassRemovalLogic(aiPlayer, sa, chosen);
+            }
+        }
         return doMassRemovalLogic(aiPlayer, sa);
     }
 
@@ -62,6 +76,11 @@ public class DestroyAllAi extends SpellAbilityAi {
     }
 
     public static AiAbilityDecision doMassRemovalLogic(Player ai, SpellAbility sa) {
+        return doMassRemovalLogic(ai, sa, null);
+    }
+
+    /** @param destroyed what will be destroyed, when ValidCards cannot say yet; null to read ValidCards */
+    private static AiAbilityDecision doMassRemovalLogic(Player ai, SpellAbility sa, CardCollectionView destroyed) {
         final Card source = sa.getHostCard();
         final String logic = sa.getParamOrDefault("AILogic", "");
 
@@ -80,8 +99,10 @@ public class DestroyAllAi extends SpellAbilityAi {
 
         // TODO should probably sort results when targeted to use on biggest threat instead of first match
         for (Player opponent: ai.getOpponents()) {
-            CardCollection opplist = CardLists.getValidCards(opponent.getCardsIn(ZoneType.Battlefield), valid, source.getController(), source, sa);
-            CardCollection ailist = CardLists.getValidCards(ai.getCardsIn(ZoneType.Battlefield), valid, source.getController(), source, sa);
+            CardCollection opplist = destroyed != null ? CardLists.filterControlledBy(destroyed, opponent)
+                    : CardLists.getValidCards(opponent.getCardsIn(ZoneType.Battlefield), valid, source.getController(), source, sa);
+            CardCollection ailist = destroyed != null ? CardLists.filterControlledBy(destroyed, ai)
+                    : CardLists.getValidCards(ai.getCardsIn(ZoneType.Battlefield), valid, source.getController(), source, sa);
 
             opplist = CardLists.filter(opplist, predicate);
             ailist = CardLists.filter(ailist, predicate);
