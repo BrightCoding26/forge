@@ -978,6 +978,12 @@ public class AttachAi extends SpellAbilityAi {
             // The same thing for an Amass: Goblin Plate Mail attaches to the Army it just made or
             // grew. Nothing is remembered until then, so falling through vetoed the cast.
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        } else if ("Remembered".equals(sa.getParam("Defined")) && sa.getParent() != null
+            && (sa.getParent().hasParam("RememberManifested") || sa.getParent().hasParam("RememberCloaked"))
+            && AiController.fixesCastVetoes(ai)) {
+            // And for the face-down 2/2 a manifest or cloak just made: Cursed Windbreaker ("manifest
+            // dread, then attach this to that creature") was cast 0 times in every run on record.
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
         return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
