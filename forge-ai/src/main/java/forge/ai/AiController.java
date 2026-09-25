@@ -145,12 +145,14 @@ public class AiController {
      * decision time, and to give the APIs and shapes upstream left without an AI one. Each vetoed its card
      * outright -- Foray of Orcs, Grishnakh, Goblin Plate Mail, Fires of Mount Doom, A-The One
      * Ring, Orcish Medicine and The Black Arrow were cast 0 times in diagnostics runs -- and
-     * A-The One Ring, Sundering Titan and Cursed Windbreaker 0 times in every run on record.
+     * A-The One Ring, Sundering Titan and Cursed Windbreaker 0 times in every run on record --
+     * or, as with Dwalin, Weaponmaster, until something it depends on was on the battlefield.
      * The checks, all gated on this:
      *
      *   ImmediateTriggerAi  a reflexive trigger judged before its parent has remembered anything
      *   AttachAi            attaching to the Army an Amass just made or grew
      *   AttachAi            attaching to the face-down creature a manifest or cloak just made
+     *   CountersPutAllAi    a creature's ETB "put a counter on each ..." with nothing to affect yet
      *   DestroyAllAi        a rider scoped to the parent's target that has nothing to destroy
      *   DestroyAllAi        destroying what a ChooseCard parent has not chosen yet
      *   DestroyAi           destroying what a damaging or targeting parent has not remembered yet

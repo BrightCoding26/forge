@@ -2,6 +2,7 @@ package forge.ai.ability;
 
 import com.google.common.collect.Lists;
 import forge.ai.AiAbilityDecision;
+import forge.ai.AiController;
 import forge.ai.AiPlayDecision;
 import forge.ai.ComputerUtilCost;
 import forge.ai.SpellAbilityAi;
@@ -81,6 +82,18 @@ public class CountersPutAllAi extends SpellAbilityAi {
                 }
             }
         } else {
+            // Dwalin, Weaponmaster's "put a hone counter on each Equipment you control" affects
+            // nothing until the AI controls an Equipment, and 0 >= 0 refused it, so
+            // AiController.checkETBEffects vetoed Dwalin until one was out: never cast in 48.5%
+            // of the games it led. A creature's ETB that puts counters on nothing costs nothing:
+            // the body is still worth casting. Only a creature not yet on the battlefield, i.e.
+            // judged before it is cast. A spell, an activated ability, or an enchantment whose
+            // ETB is its point still waits for something to affect, and once the host is in play
+            // refusing an empty mode still steers a modal trigger (Felidar Retreat) elsewhere.
+            if (hList.isEmpty() && cList.isEmpty() && sa.isTrigger() && source.isCreature()
+                    && !source.isInPlay() && AiController.fixesCastVetoes(ai)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
             // human has more things that will benefit, don't play
             if (hList.size() >= cList.size()) {
                 return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
