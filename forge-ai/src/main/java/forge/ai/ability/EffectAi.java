@@ -596,6 +596,20 @@ public class EffectAi extends SpellAbilityAi {
 
             return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         } else { //no AILogic
+            // Borne Upon a Wind, Quicken, Scout's Warning, Jace's Machinations: an Effect that only
+            // lets its controller do something at instant speed this turn, with the card's value in
+            // what follows -- a draw, or Empower Jace 8. Refusing every Effect without an AILogic
+            // made each of them uncastable. Let what follows decide, timed as a draw spell is: in
+            // the second main phase or at the end of the opponent's turn. Not when what follows is
+            // a delayed trigger, as Complete the Circuit's copy of a later spell, which the AI
+            // cannot plan for.
+            if (AiController.fixesCastVetoes(ai) && onlyGrantsInstantSpeed(sa) && sa.getSubAbility() != null
+                    && sa.getSubAbility().getApi() != ApiType.DelayedTrigger) {
+                if (phase.is(PhaseType.MAIN2, ai) || (phase.is(PhaseType.END_OF_TURN) && phase.getNextTurn().equals(ai))) {
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+                }
+                return new AiAbilityDecision(0, AiPlayDecision.AnotherTime);
+            }
             return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
@@ -628,6 +642,21 @@ public class EffectAi extends SpellAbilityAi {
         }
 
         return randomReturn ? new AiAbilityDecision(100, AiPlayDecision.WillPlay) : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+    }
+
+    /** Every static ability the Effect creates is a CastWithFlash permission. Triggers are allowed: Scout's
+     *  Warning's only remove the permission once used. */
+    private static boolean onlyGrantsInstantSpeed(final SpellAbility sa) {
+        if (!sa.hasParam("StaticAbilities") || sa.hasParam("ReplacementEffects") || sa.hasParam("RememberObjects")) {
+            return false;
+        }
+        for (String st : sa.getParam("StaticAbilities").split(",")) {
+            Map<String, String> params = FileSection.parseToMap(sa.getSVar(st), FileSection.DOLLAR_SIGN_KV_SEPARATOR);
+            if (!StaticAbilityMode.setValueOf(params.get("Mode")).equals(Set.of(StaticAbilityMode.CastWithFlash))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

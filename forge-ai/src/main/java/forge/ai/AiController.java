@@ -142,7 +142,7 @@ public class AiController {
 
     /**
      * Whether to correct eight checks that veto a spell on an evaluation that cannot be right
-     * at decision time, and to give Empower the AI upstream lacks. Each vetoed its card
+     * at decision time, and to give the APIs upstream left without an AI one. Each vetoed its card
      * outright -- Foray of Orcs, Grishnakh, Goblin Plate Mail, Fires of Mount Doom, A-The One
      * Ring, Orcish Medicine and The Black Arrow were cast 0 times in diagnostics runs -- and
      * A-The One Ring, Sundering Titan and Cursed Windbreaker 0 times in every run on record.
@@ -156,8 +156,9 @@ public class AiController {
      *   DestroyAi           destroying what a damaging or targeting parent has not remembered yet
      *   PumpAi              "you gain protection from everything" as an ETB trigger
      *   PumpAi              "your choice of X or Y" read as granting nothing
-     *   EmpowerAi           Empower, which fell back to CannotPlayAi and refused every spell and
-     *                       ability that has it
+     *   GatedFallbackAi     Empower, Intensify, Incubate, Recruit and LookAt, which upstream gives
+     *                       no AI: CannotPlayAi refused every spell and ability that has them
+     *   EffectAi            an Effect that only grants instant speed, refused for want of an AILogic
      *
      * Off by default, which is the historical behaviour, so runs made without it stay
      * reproducible. Like playUnsupportedCards, not an AIOption.
