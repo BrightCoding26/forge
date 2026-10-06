@@ -59,6 +59,23 @@ public class PhasesAi extends SpellAbilityAi {
             }
         }
 
+        // Guardian of Faith: "when this enters, any number of other target creatures you control
+        // phase out". phasesPrefTargeting is a stub that prefers nothing, so this was refused
+        // whenever checkETBEffects asked, and the Guardian was never cast. Any number includes
+        // none: phase out the AI's creatures the stack or this combat would destroy, if any.
+        if (sa.getMinTargets() == 0 && AiController.fixesCastVetoes(aiPlayer)) {
+            sa.resetTargets();
+            final List<Card> targetable = CardLists.getTargetableCards(
+                    aiPlayer.getCardsIn(ZoneType.Battlefield), sa);
+            for (final Card c : Threatened.among(aiPlayer, sa, targetable)) {
+                if (sa.getTargets().size() >= sa.getMaxTargets()) {
+                    break;
+                }
+                sa.getTargets().add(c);
+            }
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+
         if (phasesPrefTargeting(tgt, sa, mandatory)) {
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         } else if (mandatory) {

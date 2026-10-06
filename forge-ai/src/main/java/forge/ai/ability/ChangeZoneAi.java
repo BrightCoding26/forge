@@ -138,6 +138,43 @@ public class ChangeZoneAi extends SpellAbilityAi {
     }
 
     @Override
+    protected AiAbilityDecision canPlay(final Player ai, final SpellAbility sa) {
+        final AiAbilityDecision upstream = super.canPlay(ai, sa);
+        // Brokers' Safeguard: "exile target nonartifact creature you control, then return it with a
+        // shield counter". Upstream knows Cloudshift's shape, exile then return, but not one with a
+        // step in between, so it read this as removal, found no opposing card among creatures you
+        // control, and refused. Only where upstream refuses: blink the AI's best creature that the
+        // stack or this combat is about to kill.
+        if (!upstream.willingToPlay() && sa.usesTargeting() && blinksOwnCreature(sa)
+                && AiController.fixesCastVetoes(ai)) {
+            final CardCollection threatened = Threatened.among(ai, sa,
+                    CardLists.getTargetableCards(ai.getCreaturesInPlay(), sa));
+            if (threatened.isEmpty()) {
+                return new AiAbilityDecision(0, AiPlayDecision.AnotherTime);
+            }
+            sa.resetTargets();
+            sa.getTargets().add(threatened.getFirst());
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+        return upstream;
+    }
+
+    /** Exiles one of its controller's own creatures, and a later link returns what it remembered to the battlefield. */
+    private static boolean blinksOwnCreature(final SpellAbility sa) {
+        if (!"Battlefield".equals(sa.getParam("Origin")) || !"Exile".equals(sa.getParam("Destination"))
+                || !sa.getParamOrDefault("ValidTgts", "").contains("YouCtrl")) {
+            return false;
+        }
+        for (SpellAbility sub = sa.getSubAbility(); sub != null; sub = sub.getSubAbility()) {
+            if (sub.getApi() == ApiType.ChangeZone && "Battlefield".equals(sub.getParam("Destination"))
+                    && "Remembered".equals(sub.getParam("Defined"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     protected AiAbilityDecision checkApiLogic(Player aiPlayer, SpellAbility sa) {
         multipleCardsToChoose.clear();
         String aiLogic = sa.getParam("AILogic");

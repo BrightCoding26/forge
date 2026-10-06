@@ -80,6 +80,31 @@ public class PumpAi extends PumpAiBase {
     }
 
     @Override
+    protected AiAbilityDecision canPlay(final Player ai, final SpellAbility sa) {
+        // Surge of Salvation: "you and permanents you control gain hexproof until end of turn". An
+        // untargeted pump of the AI's whole side fails the pump timing and finds no single card to
+        // improve, so it was refused on every board. It answers a spell aimed at the AI's side:
+        // cast it while the stack threatens one of its permanents. Only where upstream refuses.
+        final AiAbilityDecision upstream = super.canPlay(ai, sa);
+        if (!upstream.willingToPlay() && !sa.usesTargeting() && protectsOwnSide(sa)
+                && AiController.fixesCastVetoes(ai)) {
+            if (Threatened.among(ai, sa, ai.getCardsIn(ZoneType.Battlefield)).isEmpty()) {
+                return new AiAbilityDecision(0, AiPlayDecision.AnotherTime);
+            }
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+        return upstream;
+    }
+
+    /** Defined as the AI and every permanent it controls, granting hexproof or shroud. */
+    private static boolean protectsOwnSide(final SpellAbility sa) {
+        final String defined = sa.getParamOrDefault("Defined", "");
+        final String kw = sa.getParamOrDefault("KW", "");
+        return defined.contains("Permanent.YouCtrl") && (kw.contains("Hexproof") || kw.contains("Shroud"))
+                && !sa.isCurse();
+    }
+
+    @Override
     protected boolean checkPhaseRestrictions(final Player ai, final SpellAbility sa, final PhaseHandler ph,
                                              final String logic) {
         // special Phase check for various AI logics
@@ -672,7 +697,70 @@ public class PumpAi extends PumpAiBase {
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
 
+        // Only where upstream refuses.
+        if (AiController.fixesCastVetoes(ai)) {
+            final AiAbilityDecision opposing = targetOpposingCreatureOnly(ai, sa, defense, attack, mandatory);
+            if (opposing != null) {
+                return opposing;
+            }
+        }
+
         return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+    }
+
+    /**
+     * Two shapes of targeted pump that can only touch an opponent's creature, which the pump logic
+     * misread and so refused whenever checkETBEffects asked. Grim Bauble's "-2/-2 to target creature
+     * an opponent controls" lacks IsCurse$, so it was weighed as a pump for that creature. Bartz
+     * and Boko's pump has no values at all: it only picks the creature its Birds then damage.
+     * Returns null for any other pump, and for a curse that kills nothing, which keeps upstream's
+     * hold for a target (as Fires of Mount Doom's).
+     */
+    private AiAbilityDecision targetOpposingCreatureOnly(final Player ai, final SpellAbility sa, final int defense,
+            final int attack, final boolean mandatory) {
+        final String valid = sa.getParamOrDefault("ValidTgts", "");
+        if (sa.isCurse() || !(valid.contains("OppCtrl") || valid.contains("YouDontCtrl"))) {
+            return null;
+        }
+        if (defense < 0 && attack <= 0) {
+            final CardCollection kills = getCurseCreatures(ai, sa, defense, attack, List.of());
+            if (kills.isEmpty()) {
+                return null;
+            }
+            sa.resetTargets();
+            sa.getTargets().add(ComputerUtilCard.getBestCreatureAI(kills));
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+        final SpellAbility sub = sa.getSubAbility();
+        if (sa.hasParam("NumAtt") || sa.hasParam("NumDef") || sa.hasParam("KW") || sa.hasParam("KWChoice")
+                || sub == null || !"ParentTarget".equals(sub.getParam("Defined"))
+                || (sub.getApi() != ApiType.EachDamage && sub.getApi() != ApiType.DealDamage)) {
+            return null;
+        }
+        final CardCollection opposing = CardLists.getTargetableCards(ai.getOpponents().getCreaturesInPlay(), sa);
+        if (opposing.isEmpty()) {
+            // Nothing to aim at: the trigger cannot be put on the stack, and the creature is no worse for it.
+            return mandatory ? null : new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+        final int damage = predictParentTargetDamage(sa.getHostCard(), sub);
+        final CardCollection kills = CardLists.filter(opposing, c -> !c.hasKeyword(Keyword.INDESTRUCTIBLE)
+                && ComputerUtilCombat.getDamageToKill(c, false) <= damage);
+        sa.resetTargets();
+        sa.getTargets().add(ComputerUtilCard.getBestCreatureAI(kills.isEmpty() ? opposing : kills));
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+    }
+
+    /** What a damage sub-ability aimed at its parent's target deals, read without resolving anything. */
+    private static int predictParentTargetDamage(final Card host, final SpellAbility sub) {
+        final String num = sub.getParamOrDefault("NumDmg", "0");
+        if (sub.getApi() != ApiType.EachDamage) {
+            return AbilityUtils.calculateAmount(host, num, sub);
+        }
+        int total = 0;
+        for (final Card damager : AbilityUtils.getDefinedCards(host, sub.getParam("DefinedDamagers"), sub)) {
+            total += "Count$CardPower".equals(num) ? damager.getNetPower() : AbilityUtils.calculateAmount(damager, num, sub);
+        }
+        return total;
     }
 
     @Override

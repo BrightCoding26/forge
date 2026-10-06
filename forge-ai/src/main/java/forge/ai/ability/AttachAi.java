@@ -1053,6 +1053,35 @@ public class AttachAi extends SpellAbilityAi {
      */
     // stCheck is EnchantedBy or EquippedBy; a static on the attached card
     // says so through AffectedDefined$ or through the Affected$ text
+    /**
+     * Every continuous static the Aura has applies to what it enchants and only adds to it: a
+     * trigger, an ability, keywords, positive power or toughness. Nothing negative, nothing else.
+     */
+    private static boolean onlyBuffsEnchanted(final Card aura) {
+        boolean buffs = false;
+        for (final StaticAbility st : aura.getStaticAbilities()) {
+            if (!st.checkMode(StaticAbilityMode.Continuous) || !affectsAttached(st, "EnchantedBy")) {
+                return false;
+            }
+            for (final String key : st.getMapParams().keySet()) {
+                switch (key) {
+                    case "Mode", "Affected", "AffectedDefined", "AddTrigger", "AddSVar", "AddAbility",
+                         "AddKeyword", "Description", "EffectZone" -> { }
+                    case "AddPower", "AddToughness" -> {
+                        if (AbilityUtils.calculateAmount(aura, st.getParam(key), st) < 0) {
+                            return false;
+                        }
+                    }
+                    default -> {
+                        return false;
+                    }
+                }
+            }
+            buffs = true;
+        }
+        return buffs;
+    }
+
     private static boolean affectsAttached(final StaticAbility stAb, final String stCheck) {
         final String defined = stAb.getParam("AffectedDefined");
         if (defined != null) {
@@ -1354,7 +1383,15 @@ public class AttachAi extends SpellAbilityAi {
         // Filter AI-specific targets if provided
         prefList = ComputerUtil.filterAITgts(sa, aiPlayer, prefList, true);
 
-        Card c = attachGeneralAI(aiPlayer, sa, prefList, mandatory, attachSource, sa.getParam("AILogic"));
+        String logic = sa.getParam("AILogic");
+        // Light of Promise: an Aura whose script has no AttachAILogic. With no logic, attachGeneralAI
+        // chose nothing unless forced, so such an Aura was never cast. One that only gives the
+        // enchanted creature something -- a trigger, more power or toughness, keywords -- is a pump.
+        if (logic == null && attachSource.isAura() && onlyBuffsEnchanted(attachSource)
+                && AiController.fixesCastVetoes(aiPlayer)) {
+            logic = "Pump";
+        }
+        Card c = attachGeneralAI(aiPlayer, sa, prefList, mandatory, attachSource, logic);
 
         AiController aic = ((PlayerControllerAi)aiPlayer.getController()).getAi();
         if (c != null && attachSource.isEquipment()

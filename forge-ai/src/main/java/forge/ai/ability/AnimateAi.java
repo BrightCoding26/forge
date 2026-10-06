@@ -44,6 +44,85 @@ import java.util.Map;
 public class AnimateAi extends SpellAbilityAi {
 
     @Override
+    protected AiAbilityDecision canPlay(final Player ai, final SpellAbility sa) {
+        final AiAbilityDecision upstream = super.canPlay(ai, sa);
+        // Only where upstream refuses, so a card it already plays keeps its logic.
+        if (!upstream.willingToPlay() && sa.usesTargeting() && AiController.fixesCastVetoes(ai)) {
+            if (onlyGrantsReturnWhenDies(sa)) {
+                return returnWhenDiesTarget(ai, sa);
+            }
+            if (stripsAbilitiesAsRemoval(sa)) {
+                return stripAbilitiesTarget(ai, sa);
+            }
+        }
+        return upstream;
+    }
+
+    /**
+     * Undying Malice, Feign Death, Not Dead After All, Bail Out: target creature gains "when this
+     * dies, return it to the battlefield". The animate logic weighs turning something into a
+     * creature and its timing waits for combat, so these were refused in every game on record. They
+     * are saves: cast one on the AI's best creature that the stack or this combat is about to kill.
+     */
+    private AiAbilityDecision returnWhenDiesTarget(final Player ai, final SpellAbility sa) {
+        final List<Card> mine = CardLists.getTargetableCards(ai.getCreaturesInPlay(), sa);
+        final CardCollection threatened = Threatened.among(ai, sa, mine);
+        if (threatened.isEmpty()) {
+            return new AiAbilityDecision(0, AiPlayDecision.AnotherTime);
+        }
+        sa.resetTargets();
+        sa.getTargets().add(threatened.getFirst());
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+    }
+
+    /**
+     * Patriar's Humiliation: target creature perpetually loses all abilities, then takes damage. That
+     * is removal for an opposing creature, but the animate logic looked for something to animate and
+     * refused. Aim it as removal: the best opposing creature the damage kills, else the best one.
+     */
+    private AiAbilityDecision stripAbilitiesTarget(final Player ai, final SpellAbility sa) {
+        final CardCollection opposing = CardLists.getTargetableCards(ai.getOpponents().getCreaturesInPlay(), sa);
+        if (opposing.isEmpty()) {
+            return new AiAbilityDecision(0, AiPlayDecision.TargetingFailed);
+        }
+        final SpellAbility sub = sa.getSubAbility();
+        final int damage = sub != null && sub.getApi() == ApiType.DealDamage
+                ? AbilityUtils.calculateAmount(sa.getHostCard(), sub.getParamOrDefault("NumDmg", "0"), sub) : 0;
+        final CardCollection kills = CardLists.filter(opposing, c -> damage > 0
+                && !c.hasKeyword(Keyword.INDESTRUCTIBLE) && ComputerUtilCombat.getDamageToKill(c, false) <= damage);
+        sa.resetTargets();
+        sa.getTargets().add(ComputerUtilCard.getBestCreatureAI(kills.isEmpty() ? opposing : kills));
+        return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+    }
+
+    /** Every trigger it grants is "when this dies, return it from the graveyard to the battlefield", and it grants nothing else. */
+    private static boolean onlyGrantsReturnWhenDies(final SpellAbility sa) {
+        if (!sa.hasParam("Triggers") || sa.hasParam("Power") || sa.hasParam("Toughness") || sa.hasParam("Types")
+                || sa.hasParam("Keywords") || sa.hasParam("Abilities") || sa.hasParam("RemoveAllAbilities")) {
+            return false;
+        }
+        for (final String name : sa.getParam("Triggers").split(",")) {
+            final Map<String, String> trig = FileSection.parseToMap(sa.getSVar(name), FileSection.DOLLAR_SIGN_KV_SEPARATOR);
+            final Map<String, String> exec = FileSection.parseToMap(sa.getSVar(trig.getOrDefault("Execute", "")),
+                    FileSection.DOLLAR_SIGN_KV_SEPARATOR);
+            if (!"ChangesZone".equals(trig.get("Mode")) || !"Battlefield".equals(trig.get("Origin"))
+                    || !"Graveyard".equals(trig.get("Destination")) || !"Card.Self".equals(trig.get("ValidCard"))
+                    || !"Graveyard".equals(exec.get("Origin")) || !"Battlefield".equals(exec.get("Destination"))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** It takes all abilities away from a targeted creature, grants nothing, and is followed by damage to it. */
+    private static boolean stripsAbilitiesAsRemoval(final SpellAbility sa) {
+        final SpellAbility sub = sa.getSubAbility();
+        return sa.hasParam("RemoveAllAbilities") && !sa.hasParam("Abilities") && !sa.hasParam("Keywords")
+                && !sa.hasParam("Triggers") && !sa.hasParam("Power") && !sa.hasParam("Toughness")
+                && sub != null && sub.getApi() == ApiType.DealDamage && "Targeted".equals(sub.getParam("Defined"));
+    }
+
+    @Override
     protected boolean checkAiLogic(final Player ai, final SpellAbility sa, final String aiLogic) {
         final Game game = ai.getGame();
         final PhaseHandler ph = game.getPhaseHandler();

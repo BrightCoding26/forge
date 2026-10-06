@@ -89,6 +89,13 @@ public class ChooseColorAi extends SpellAbilityAi {
         if (mandatory) {
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
+        // Utopia Sprawl, Shimmerwilds Growth: "as this enters, choose a color". checkETBEffects asks
+        // whether the AI would choose, and with no AILogic checkApiLogic refused, so the card was
+        // never cast. The choice is part of the card, and at resolution the AI takes the most
+        // prominent color in its hand.
+        if (!sa.hasParam("AILogic") && AiController.fixesCastVetoes(ai)) {
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
         return canPlay(ai, sa);
     }
 

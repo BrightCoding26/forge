@@ -130,6 +130,14 @@ public class FightAi extends SpellAbilityAi {
         if (decision.willingToPlay()) {
             return decision;
         }
+        // Warbriar Blessing: "when this enters, enchanted creature fights up to one target creature
+        // you don't control". With no good fight available checkApiLogic refused, and since
+        // checkETBEffects asks before every cast, the Aura was vetoed for the fight it may skip.
+        // Up to one includes none.
+        if (sa.usesTargeting() && sa.getMinTargets() == 0 && AiController.fixesCastVetoes(ai)) {
+            sa.resetTargets();
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
         if (!mandatory) {
             return decision;
         }

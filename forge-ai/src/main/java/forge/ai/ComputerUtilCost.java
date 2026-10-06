@@ -156,7 +156,13 @@ public class ComputerUtilCost {
                     num = hand.size();
                 } else {
                     if (type.equals("CARDNAME")) {
-                        if (source.getAbilityText().contains("Bloodrush")) {
+                        // Bloodrush is an ability word, in the ability's own PrecostDesc. Rendering
+                        // the whole card's text to look for it threw for Kogla and Yidaro, whose
+                        // ETB charm asks for target candidates while the card is still in hand, and
+                        // the exception lost the AI that entire decision whenever Kogla was in hand.
+                        if (AiController.fixesCastVetoes(ai)
+                                ? sa.getParamOrDefault("PrecostDesc", "").contains("Bloodrush")
+                                : source.getAbilityText().contains("Bloodrush")) {
                             continue;
                         }
                         if (ai.getGame().getPhaseHandler().is(PhaseType.END_OF_TURN, ai)

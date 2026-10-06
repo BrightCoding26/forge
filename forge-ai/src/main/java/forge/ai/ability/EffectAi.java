@@ -610,6 +610,25 @@ public class EffectAi extends SpellAbilityAi {
                 }
                 return new AiAbilityDecision(0, AiPlayDecision.AnotherTime);
             }
+            // Champions of Tyr, Rothga: "when this enters, you get a boon". A boon is a lasting
+            // effect for its controller and nothing else, but with no AILogic it was refused,
+            // and checkETBEffects vetoed the creature with it.
+            if ("True".equals(sa.getParam("Boon")) && AiController.fixesCastVetoes(ai)) {
+                return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+            }
+            // Teferi's Protection: "until your next turn, your life total can't change, you gain
+            // protection from everything, and your permanents phase out". With no AILogic it was
+            // refused on every board. It is a last resort: cast it once blockers are declared
+            // against the AI, if the attack would still kill it.
+            if (locksOwnLife(sa) && AiController.fixesCastVetoes(ai)) {
+                final Combat combat = game.getCombat();
+                if (combat != null && phase.getPlayerTurn().isOpponentOf(ai)
+                        && phase.is(PhaseType.COMBAT_DECLARE_BLOCKERS)
+                        && ComputerUtilCombat.lifeInSeriousDanger(ai, combat)) {
+                    return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+                }
+                return new AiAbilityDecision(0, AiPlayDecision.AnotherTime);
+            }
             return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
         }
 
@@ -642,6 +661,21 @@ public class EffectAi extends SpellAbilityAi {
         }
 
         return randomReturn ? new AiAbilityDecision(100, AiPlayDecision.WillPlay) : new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
+    }
+
+    /** One of the statics the Effect creates is "your life total can't change". */
+    private static boolean locksOwnLife(final SpellAbility sa) {
+        if (!sa.hasParam("StaticAbilities")) {
+            return false;
+        }
+        for (String st : sa.getParam("StaticAbilities").split(",")) {
+            Map<String, String> params = FileSection.parseToMap(sa.getSVar(st), FileSection.DOLLAR_SIGN_KV_SEPARATOR);
+            if (StaticAbilityMode.setValueOf(params.get("Mode")).contains(StaticAbilityMode.CantChangeLife)
+                    && "You".equals(params.get("ValidPlayer"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Every static ability the Effect creates is a CastWithFlash permission. Triggers are allowed: Scout's

@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import forge.StaticData;
 import forge.ai.*;
 import forge.card.*;
+import forge.game.ability.ApiType;
 import forge.game.card.*;
 import forge.game.player.Player;
 import forge.game.spellability.SpellAbility;
@@ -45,6 +46,11 @@ public class ChooseCardNameAi extends SpellAbilityAi {
             }
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
+        // Drafting a card from a spellbook only ever gives its controller a card; the draft
+        // itself picks the best one. Without an AILogic every Draft was refused.
+        if (sa.getApi() == ApiType.Draft && AiController.fixesCastVetoes(ai)) {
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
         return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);
     }
 
@@ -73,6 +79,15 @@ public class ChooseCardNameAi extends SpellAbilityAi {
         }
 
         if (mandatory) {
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
+        // Key to the Archive, Emmara, Hinterland Chef: "when this enters, draft a card". Curse of
+        // Silence: "as this enters, choose a card name". checkETBEffects asks each such ETB whether
+        // the AI would choose it, and with no AILogic the answer was no, so the permanent was never
+        // cast. Naming or drafting costs the AI nothing, and at resolution it drafts the best card
+        // or names an opponent's nonland card.
+        if (aiLogic.isEmpty() && (sa.getApi() == ApiType.Draft || sa.getApi() == ApiType.NameCard)
+                && AiController.fixesCastVetoes(ai)) {
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
         return new AiAbilityDecision(0, AiPlayDecision.CantPlayAi);

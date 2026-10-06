@@ -141,8 +141,8 @@ public class AiController {
     }
 
     /**
-     * Whether to correct eight checks that veto a spell on an evaluation that cannot be right
-     * at decision time, and to give the APIs upstream left without an AI one. Each vetoed its card
+     * Whether to correct the checks that veto a spell on an evaluation that cannot be right at
+     * decision time, and to give the APIs and shapes upstream left without an AI one. Each vetoed its card
      * outright -- Foray of Orcs, Grishnakh, Goblin Plate Mail, Fires of Mount Doom, A-The One
      * Ring, Orcish Medicine and The Black Arrow were cast 0 times in diagnostics runs -- and
      * A-The One Ring, Sundering Titan and Cursed Windbreaker 0 times in every run on record.
@@ -159,6 +159,19 @@ public class AiController {
      *   GatedFallbackAi     Empower, Intensify, Incubate, Recruit and LookAt, which upstream gives
      *                       no AI: CannotPlayAi refused every spell and ability that has them
      *   EffectAi            an Effect that only grants instant speed, refused for want of an AILogic
+     *   EffectAi            a boon, refused for want of an AILogic; "your life total can't change",
+     *                       now cast when an attack would kill the AI
+     *   ChooseCardNameAi    "draft a card" or "choose a card name" as an ETB, with no AILogic
+     *   ChooseColorAi       "choose a color" as an ETB, with no AILogic
+     *   PhasesAi, FightAi   "any number of" or "up to one" targets, refused when the best choice is none
+     *   PumpAi              a -X/-X on an opposing creature with no IsCurse$; a pump that only picks
+     *                       the target of the damage behind it; hexproof for the AI's whole side
+     *   CountersProliferateAi  a proliferate rider weighed against the whole spell's mana cost
+     *   AnimateAllAi        a keyword strip that sets up a sweep; abilities for the AI's own creatures
+     *   AnimateAi           "when this dies, return it", now cast to save; an ability strip that is removal
+     *   ChangeZoneAi        a blink of the AI's own creature, now cast to save it
+     *   AttachAi            an Aura with no AttachAILogic that only adds to what it enchants
+     *   ComputerUtilCost    a Bloodrush test that threw on Kogla and Yidaro and lost the AI its decision
      *
      * Off by default, which is the historical behaviour, so runs made without it stay
      * reproducible. Like playUnsupportedCards, not an AIOption.

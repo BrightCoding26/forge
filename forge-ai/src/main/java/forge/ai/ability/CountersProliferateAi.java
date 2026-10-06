@@ -123,6 +123,14 @@ public class CountersProliferateAi extends SpellAbilityAi {
         if ("Always".equals(sa.getParam("AILogic"))) {
             return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
         }
+        // Experimental Augury: "look at the top three, take one. Proliferate." As a rider the
+        // proliferate was weighed against the whole spell's mana cost, with an integer division
+        // that rounds a small gain to nothing, so the spell was refused unless the AI already had
+        // counters worth its full price. A rider costs nothing more, and the AI chooses what to
+        // proliferate, which may be nothing; the rest of the spell decides the cast.
+        if (AiController.fixesCastVetoes(ai)) {
+            return new AiAbilityDecision(100, AiPlayDecision.WillPlay);
+        }
 
         return checkApiLogic(ai, sa);
     }
