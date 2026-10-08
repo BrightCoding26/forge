@@ -2425,7 +2425,8 @@ public class GameAction {
                 Card target = null;
                 int from = -1;
                 for (int i = 0; i < cards.size(); i++) {
-                    if (Match.slotName(plant).equals(Match.slotName(cards.get(i).getPaperCard().getName()))) {
+                    if (cards.get(i).getPaperCard() != null
+                            && Match.slotName(plant).equals(Match.slotName(cards.get(i).getPaperCard().getName()))) {
                         target = cards.get(i);
                         from = i;
                         break;
@@ -2446,7 +2447,7 @@ public class GameAction {
                 } else {
                     boolean inHand = false;
                     for (Card c : p.getCardsIn(ZoneType.Hand)) {
-                        if (Match.slotName(plant).equals(Match.slotName(c.getPaperCard().getName()))) {
+                        if (c.getPaperCard() != null && Match.slotName(plant).equals(Match.slotName(c.getPaperCard().getName()))) {
                             inHand = true;
                             break;
                         }
@@ -2457,7 +2458,7 @@ public class GameAction {
             if (rp.getLogTop() > 0) {
                 StringBuilder hand = new StringBuilder();
                 for (Card c : p.getCardsIn(ZoneType.Hand)) {
-                    hand.append(hand.length() == 0 ? "" : " | ").append(c.getPaperCard().getName());
+                    hand.append(hand.length() == 0 ? "" : " | ").append(c.getPaperCard() != null ? c.getPaperCard().getName() : c.getName());
                 }
                 StringBuilder top = new StringBuilder();
                 int n = 0;
@@ -2465,7 +2466,7 @@ public class GameAction {
                     if (n++ >= rp.getLogTop()) {
                         break;
                     }
-                    top.append(top.length() == 0 ? "" : " | ").append(c.getPaperCard().getName());
+                    top.append(top.length() == 0 ? "" : " | ").append(c.getPaperCard() != null ? c.getPaperCard().getName() : c.getName());
                 }
                 System.out.println("Opening: " + p.getName() + " hand: " + hand);
                 System.out.println("Opening: " + p.getName() + " top: " + top);

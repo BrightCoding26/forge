@@ -393,7 +393,9 @@ public class SimulateMatch {
                     ZoneType.Graveyard, ZoneType.Exile, ZoneType.Command, ZoneType.Stack}) {
                 CardCollectionView cards = first.getCardsIn(zone);
                 for (int k = 0; k < cards.size(); k++) {
-                    if (Match.slotName(trackedCard).equals(Match.slotName(cards.get(k).getPaperCard().getName()))) {
+                    // Tokens (a Jace token from Empower, say) have no PaperCard: skip them, never dereference.
+                    if (cards.get(k).getPaperCard() != null
+                            && Match.slotName(trackedCard).equals(Match.slotName(cards.get(k).getPaperCard().getName()))) {
                         where = zone == ZoneType.Library ? "Library " + k + " of " + cards.size() : zone.name();
                         break;
                     }
