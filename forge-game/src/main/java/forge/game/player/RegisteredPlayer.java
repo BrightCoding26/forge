@@ -41,6 +41,19 @@ public class RegisteredPlayer {
     private boolean randomFoil = false;
     private boolean enableETBCountersEffect = false;
 
+    // Simulation-only aids for paired comparisons, all off unless SimulateMatch sets them.
+    // libraryOrder: build the library in this order (one name per card, as the deck file
+    // listed them) instead of the deck's hash order, so swapping one card leaves every
+    // other card where it was before the shuffle. plantCard/plantPosition: after
+    // mulligans, move that card from the library to that depth (0 = top), or, when the
+    // position is negative, to the fraction plantFraction of the way down it. logTop: print
+    // the kept hand and the top cards of the library once mulligans are done.
+    private List<String> libraryOrder = null;
+    private String plantCard = null;
+    private int plantPosition = -1;
+    private double plantFraction = -1;
+    private int logTop = 0;
+
     public RegisteredPlayer(Deck deck0) {
         originalDeck = deck0;
         restoreDeck();
@@ -96,6 +109,33 @@ public class RegisteredPlayer {
             this.extraCardsInCommandZone = extraCardsInCommandZone;
         else
             this.extraCardsInCommandZone = Iterables.concat(this.extraCardsInCommandZone, extraCardsInCommandZone);
+    }
+
+    public List<String> getLibraryOrder() {
+        return libraryOrder;
+    }
+    public void setLibraryOrder(List<String> order) {
+        libraryOrder = order;
+    }
+    public String getPlantCard() {
+        return plantCard;
+    }
+    public int getPlantPosition() {
+        return plantPosition;
+    }
+    public double getPlantFraction() {
+        return plantFraction;
+    }
+    public void setPlant(String card, int position, double fraction) {
+        plantCard = card;
+        plantPosition = position;
+        plantFraction = fraction;
+    }
+    public int getLogTop() {
+        return logTop;
+    }
+    public void setLogTop(int n) {
+        logTop = n;
     }
 
     public int getStartingHand() {

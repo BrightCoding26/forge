@@ -21,7 +21,10 @@ import forge.game.GameLogEntryType;
 import forge.game.GameRules;
 import forge.game.GameType;
 import forge.game.Match;
+import forge.game.card.CardCollectionView;
+import forge.game.player.Player;
 import forge.game.player.RegisteredPlayer;
+import forge.game.zone.ZoneType;
 import forge.gamemodes.tournament.system.AbstractTournament;
 import forge.gamemodes.tournament.system.TournamentBracket;
 import forge.gamemodes.tournament.system.TournamentPairing;
@@ -38,6 +41,9 @@ import forge.util.WordUtil;
 import forge.util.storage.IStorage;
 
 public class SimulateMatch {
+    // -simtrack (or -simplant): the first deck's card whose final zone is printed after each game.
+    private static String trackedCard = null;
+
     public static void simulate(String[] args) {
         FModel.initialize(null, null);
 
@@ -135,6 +141,38 @@ public class SimulateMatch {
         // by default so that runs made without it can be reproduced.
         boolean fixCastVetoes = params.containsKey("simvetofix");
 
+        // Pairing aids for comparing two versions of the first deck over shared seeds. All
+        // three are off by default, and none draws from the game's random stream.
+        //
+        // -simslotorder builds each deck's library in the order its .dck file lists the cards,
+        // not in the deck's hash order. Swapping one card then leaves every other card at the
+        // same index before the shuffle, so the two versions deal the same library apart from
+        // that card, and a game in which it is never drawn plays out the same in both.
+        //
+        // -simplant <card> moves that card of the first deck, once mulligans are done, to a
+        // depth drawn uniformly from the top -simplantdepth (default 30) cards of its library,
+        // using a generator seeded from the game's seed. Most games never draw a given card,
+        // and those games say nothing about it; planting makes it reachable in nearly every
+        // game. -simplantmix <p> (default 1) plants in the top only in that share of games and
+        // anywhere in the library, as a fair shuffle would, in the rest: with p below 1 every
+        // depth keeps a known, nonzero chance, so reweighting by depth is exactly unbiased
+        // even for a game that reaches deep or shuffles. The "Plant:" line says where it went.
+        //
+        // -simlogtop <n> prints the first deck's kept hand and the top n cards of its library
+        // once mulligans are done.
+        //
+        // -simtrack <card> prints, after each game, the zone that card of the first deck ended
+        // in. Still in the library means it was never drawn, which is the game a one-card swap
+        // should replay exactly. -simplant tracks its card too.
+        boolean slotOrder = params.containsKey("simslotorder");
+        String plantCard = params.containsKey("simplant") ? String.join(" ", params.get("simplant")) : null;
+        int plantDepth = params.containsKey("simplantdepth") ? Integer.parseInt(params.get("simplantdepth").get(0)) : 30;
+        double plantMix = params.containsKey("simplantmix") ? Double.parseDouble(params.get("simplantmix").get(0)) : 1.0;
+        int logTop = params.containsKey("simlogtop") ? Integer.parseInt(params.get("simlogtop").get(0)) : 0;
+        RegisteredPlayer firstDeck = null;
+        trackedCard = plantCard != null ? plantCard
+                : params.containsKey("simtrack") ? String.join(" ", params.get("simtrack")) : null;
+
         Long seed = null;
         if (params.containsKey("s")) {
             seed = Long.parseLong(params.get("s").get(0));
@@ -210,6 +248,18 @@ public class SimulateMatch {
                 } else {
                     rp = new RegisteredPlayer(d);
                 }
+                if (slotOrder) {
+                    File deckFile = deckFileFromCommandLineParameter(deck, type, deckDir);
+                    if (deckFile == null) {
+                        System.out.println(TextUtil.concatNoSpace("-simslotorder needs a deck file - ", deck));
+                        return;
+                    }
+                    rp.setLibraryOrder(readMainOrder(deckFile));
+                }
+                if (i == 1) {
+                    firstDeck = rp;
+                    rp.setLogTop(logTop);
+                }
                 LobbyPlayer lobbyPlayer = GamePlayerUtil.createAiPlayer(name, i - 1, profile);
                 if (lobbyPlayer instanceof LobbyPlayerAi) {
                     // Set after construction rather than passing options in: the overloads
@@ -259,6 +309,14 @@ public class SimulateMatch {
                 if (perGameSeed && seed != null) {
                     MyRandom.setRandom(new Random(seed + iGame));
                 }
+                if (plantCard != null && firstDeck != null) {
+                    Random plantRng = plantRandom(seed, iGame);
+                    if (plantRng.nextDouble() < plantMix) {
+                        firstDeck.setPlant(plantCard, plantRng.nextInt(Math.max(1, plantDepth)), -1);
+                    } else {
+                        firstDeck.setPlant(plantCard, -1, plantRng.nextDouble());
+                    }
+                }
                 simulateSingleMatch(mc, iGame, outputGamelog);
             }
         }
@@ -286,6 +344,12 @@ public class SimulateMatch {
         System.out.println("	simai - Use the look-ahead simulation AI for every player instead of the heuristic one. Much slower.");
         System.out.println("	simunsupported - Let the AI cast cards marked AI:RemoveDeck:All instead of never playing them.");
         System.out.println("	simvetofix - Correct the AI checks that veto a cast on inputs that do not exist yet (see AiController).");
+        System.out.println("	simslotorder - Build each library in its .dck file's order, so a one-card swap moves nothing else.");
+        System.out.println("	simplant <card> - After mulligans, move that card of the first deck to a seeded depth in its library.");
+        System.out.println("	simplantdepth <n> - Plant within the top n cards (default 30).");
+        System.out.println("	simplantmix <p> - Plant in the top in this share of games, anywhere in the rest (default 1).");
+        System.out.println("	simlogtop <n> - Print the first deck's kept hand and the top n cards of its library.");
+        System.out.println("	simtrack <card> - After each game, print the zone that card of the first deck ended in.");
     }
 
     public static void simulateSingleMatch(final Match mc, int iGame, boolean outputGamelog) {
@@ -320,6 +384,25 @@ public class SimulateMatch {
         Collections.reverse(log);
         for (GameLogEntry l : log) {
             System.out.println(l);
+        }
+
+        if (trackedCard != null && !g1.getRegisteredPlayers().isEmpty()) {
+            Player first = g1.getRegisteredPlayers().get(0);
+            String where = "absent";
+            for (ZoneType zone : new ZoneType[] {ZoneType.Library, ZoneType.Hand, ZoneType.Battlefield,
+                    ZoneType.Graveyard, ZoneType.Exile, ZoneType.Command, ZoneType.Stack}) {
+                CardCollectionView cards = first.getCardsIn(zone);
+                for (int k = 0; k < cards.size(); k++) {
+                    if (Match.slotName(trackedCard).equals(Match.slotName(cards.get(k).getPaperCard().getName()))) {
+                        where = zone == ZoneType.Library ? "Library " + k + " of " + cards.size() : zone.name();
+                        break;
+                    }
+                }
+                if (!where.equals("absent")) {
+                    break;
+                }
+            }
+            System.out.println("Track: " + first.getName() + " " + trackedCard + " " + where);
         }
 
         // If both players life totals to 0 in a single turn, the game should end in a draw
@@ -458,6 +541,73 @@ public class SimulateMatch {
     }
 
     public static Match simulateOffthreadGame(List<Deck> decks, GameType format, int games) {
+        return null;
+    }
+
+    /**
+     * The generator that places game iGame's planted card: its own, seeded by the game's seed,
+     * so both versions of a paired comparison plant at the same depth and the game's random
+     * stream is not touched. The constants decorrelate it from the game's Random(seed + iGame).
+     */
+    static Random plantRandom(Long seed, int iGame) {
+        long base = seed == null ? 0L : seed;
+        return new Random((base + iGame) * 0x9E3779B97F4A7C15L + 0x2545F4914F6CDD1DL);
+    }
+
+    /**
+     * One card name per copy, in the order the [Main] section of a .dck file lists them.
+     * A line is "N Name" with optional "|SET|art" after the name and "+" for a foil.
+     */
+    static List<String> readMainOrder(File deckFile) {
+        List<String> order = new ArrayList<>();
+        boolean inMain = false;
+        try {
+            for (String raw : java.nio.file.Files.readAllLines(deckFile.toPath(), java.nio.charset.StandardCharsets.UTF_8)) {
+                String line = raw.trim();
+                if (line.startsWith("[")) {
+                    inMain = line.equalsIgnoreCase("[Main]");
+                    continue;
+                }
+                if (!inMain || line.isEmpty()) {
+                    continue;
+                }
+                int space = line.indexOf(' ');
+                int count = 1;
+                String name = line;
+                if (space > 0 && line.substring(0, space).chars().allMatch(Character::isDigit)) {
+                    count = Integer.parseInt(line.substring(0, space));
+                    name = line.substring(space + 1);
+                }
+                int bar = name.indexOf('|');
+                if (bar >= 0) {
+                    name = name.substring(0, bar);
+                }
+                name = name.trim();
+                if (name.endsWith("+")) {
+                    name = name.substring(0, name.length() - 1).trim();
+                }
+                for (int k = 0; k < count; k++) {
+                    order.add(name);
+                }
+            }
+        } catch (java.io.IOException e) {
+            System.out.println("Could not read deck order from " + deckFile + ": " + e.getMessage());
+            return null;
+        }
+        return order;
+    }
+
+    private static File deckFileFromCommandLineParameter(String deckname, GameType type, String deckDir) {
+        int dotpos = deckname.lastIndexOf('.');
+        if (dotpos > 0 && dotpos == deckname.length() - 4) {
+            String baseDir = deckDir != null ? deckDir : (type.getDeckFormat().hasCommander() ?
+                    ForgeConstants.DECK_COMMANDER_DIR : ForgeConstants.DECK_CONSTRUCTED_DIR);
+            if (!baseDir.endsWith(File.separator)) {
+                baseDir += File.separator;
+            }
+            File f = new File(baseDir + deckname);
+            return f.exists() ? f : null;
+        }
         return null;
     }
 

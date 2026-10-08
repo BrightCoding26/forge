@@ -2373,6 +2373,7 @@ public class GameAction {
             if (game.isGameOver()) { break; } // conceded during "mulligan" prompt
 
             game.setAge(GameStage.Play);
+            afterMulligans();
 
             //<THIS CODE WILL WORK WITH PHASE = NULL>
             if (game.getRules().hasAppliedVariant(GameType.Planechase)) {
@@ -2399,6 +2400,77 @@ public class GameAction {
 
             first = game.getPhaseHandler().getPlayerTurn(); // needed only for restart
         } while (game.getAge() == GameStage.RestartedByKarn);
+    }
+
+    /**
+     * Simulation only, and only for players SimulateMatch flagged: once every hand is kept,
+     * move the planted card to its depth in the library, then print the kept hand and the top
+     * of the library. Neither step draws from the game's random stream, so an unflagged
+     * player's game is unchanged.
+     *
+     * Planting after mulligans keeps the keep-or-mulligan decision natural: the card is moved
+     * only if it is in the library by then, and the log says where it was, so a caller can
+     * weight the games where it sat in the kept hand differently from those it was planted in.
+     */
+    private void afterMulligans() {
+        for (final Player p : game.getPlayers()) {
+            final RegisteredPlayer rp = p.getRegisteredPlayer();
+            if (rp == null) {
+                continue;
+            }
+            final PlayerZone library = p.getZone(ZoneType.Library);
+            final String plant = rp.getPlantCard();
+            if (plant != null && (rp.getPlantPosition() >= 0 || rp.getPlantFraction() >= 0)) {
+                List<Card> cards = new ArrayList<>(library.getCards());
+                Card target = null;
+                int from = -1;
+                for (int i = 0; i < cards.size(); i++) {
+                    if (Match.slotName(plant).equals(Match.slotName(cards.get(i).getPaperCard().getName()))) {
+                        target = cards.get(i);
+                        from = i;
+                        break;
+                    }
+                }
+                if (target != null) {
+                    cards.remove(from);
+                    // A fraction spreads the card uniformly over every slot the library has,
+                    // which is where a fair shuffle would have left it.
+                    boolean anywhere = rp.getPlantPosition() < 0;
+                    int to = anywhere
+                            ? Math.min((int) (rp.getPlantFraction() * (cards.size() + 1)), cards.size())
+                            : Math.min(rp.getPlantPosition(), cards.size());
+                    cards.add(to, target);
+                    library.setCards(cards);
+                    System.out.println("Plant: " + p.getName() + " " + plant + " library " + to + " of " + cards.size()
+                            + " from " + from + (anywhere ? " anywhere" : " top"));
+                } else {
+                    boolean inHand = false;
+                    for (Card c : p.getCardsIn(ZoneType.Hand)) {
+                        if (Match.slotName(plant).equals(Match.slotName(c.getPaperCard().getName()))) {
+                            inHand = true;
+                            break;
+                        }
+                    }
+                    System.out.println("Plant: " + p.getName() + " " + plant + (inHand ? " hand" : " absent"));
+                }
+            }
+            if (rp.getLogTop() > 0) {
+                StringBuilder hand = new StringBuilder();
+                for (Card c : p.getCardsIn(ZoneType.Hand)) {
+                    hand.append(hand.length() == 0 ? "" : " | ").append(c.getPaperCard().getName());
+                }
+                StringBuilder top = new StringBuilder();
+                int n = 0;
+                for (Card c : library.getCards()) {
+                    if (n++ >= rp.getLogTop()) {
+                        break;
+                    }
+                    top.append(top.length() == 0 ? "" : " | ").append(c.getPaperCard().getName());
+                }
+                System.out.println("Opening: " + p.getName() + " hand: " + hand);
+                System.out.println("Opening: " + p.getName() + " top: " + top);
+            }
+        }
     }
 
     private Player determineFirstTurnPlayer(final GameOutcome lastGameOutcome) {
