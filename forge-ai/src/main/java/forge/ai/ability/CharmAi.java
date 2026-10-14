@@ -294,6 +294,26 @@ public class CharmAi extends SpellAbilityAi {
         if (chosen.size() == min - 1 && goodChoice != null) {
             chosen.add(0, goodChoice);  // hack to make Dromoka's Command fight targets work
         }
+        // "Choose three. You may choose the same mode more than once." Each mode was only ever
+        // picked once, so Mystic Confluence was cast only when a spell to counter, a creature to
+        // bounce and a reason to draw all lined up at the same moment (16 games of 360) and
+        // refused everywhere else -- the end-of-turn draw three, or counter and draw two. Fill
+        // the missing picks by repeating an untargeted mode that is acceptable as a rider (draw,
+        // tokens, life, proliferate); a repeated targeted mode would only hit the same target.
+        if (chosen.size() < min && !chosen.isEmpty() && sa.hasParam("CanRepeatModes")
+                && AiController.fixesCastVetoes(ai)) {
+            AbilitySub filler = null;
+            for (AbilitySub sub : choices) {
+                sub.setActivatingPlayer(ai);
+                if (!sub.usesTargeting() && SpellApiToAi.Converter.get(sub).chkDrawbackWithSubs(ai, sub).willingToPlay()) {
+                    filler = sub;
+                    break;
+                }
+            }
+            while (filler != null && chosen.size() < min) {
+                chosen.add(filler);
+            }
+        }
         if (chosen.size() != min) {
             chosen.clear();
         }
