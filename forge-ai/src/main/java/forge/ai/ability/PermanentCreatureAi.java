@@ -86,7 +86,7 @@ public class PermanentCreatureAi extends PermanentAi {
         return super.checkPhaseRestrictions(ai, sa, ph);
     }
 
-    private boolean doAdvancedFlashLogic(Card card, final Player ai, SpellAbility sa) {
+    static boolean doAdvancedFlashLogic(Card card, final Player ai, SpellAbility sa) {
         Game game = ai.getGame();
         PhaseHandler ph = game.getPhaseHandler();
         Combat combat = game.getCombat();
