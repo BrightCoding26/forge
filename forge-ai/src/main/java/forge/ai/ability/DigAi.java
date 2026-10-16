@@ -162,6 +162,26 @@ public class DigAi extends SpellAbilityAi {
         if (sa.getActivatingPlayer().isOpponentOf(ai) && relatedPlayer.isOpponentOf(ai) && !"ChooseBestForOpponent".equals(logic)) {
             return ComputerUtilCard.getWorstPermanentAI(valid, false, true, false, false);
         }
+        // The best card was chosen whatever the destination, so a card bound for the bottom of
+        // the AI's own library was its best one: Expressive Iteration buried the better of the
+        // two cards left and exiled the worse "to play this turn". When the chosen card goes to
+        // the bottom, bottom one that cannot be used this turn if there is one, else the worst.
+        if (AiController.fixesCastVetoes(ai) && "Library".equals(sa.getParam("DestinationZone"))
+                && "-1".equals(sa.getParamOrDefault("LibraryPosition", "-1"))
+                && ai.equals(sa.getActivatingPlayer()) && (relatedPlayer == null || ai.equals(relatedPlayer))) {
+            final int mana = ComputerUtilMana.getAvailableManaEstimate(ai, false);
+            final CardCollection later = CardLists.filter(valid,
+                    c -> c.isLand() ? !ai.canPlayLand(c, true, null) : c.getCMC() > mana);
+            final Card bottom = ComputerUtilCard.getWorstAI(
+                    later.isEmpty() || later.size() == Iterables.size(valid) ? valid : later);
+            if (bottom != null) {
+                if (AiController.DEBUG_CAST_AI) {
+                    System.out.println("CastAiDebug: " + sa.getHostCard().getName() + " bottoms " + bottom.getName()
+                            + " of " + valid + " (mana " + mana + ")");
+                }
+                return bottom;
+            }
+        }
         return ComputerUtilCard.getBestAI(valid);
     }
 
