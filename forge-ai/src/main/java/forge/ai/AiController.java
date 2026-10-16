@@ -1249,6 +1249,15 @@ public class AiController {
                 if (numLandsInHand > 0) {
                     numLandsAvailable++;
                 }
+                if (fixCastVetoes) {
+                    // "Unplayable" meant "costs more than this turn's mana", so a looter on turn 3
+                    // threw away the deck's six-drop: Gandalf v27 discarded Elspeth, Sun's Champion
+                    // to Jace, Vryn's Prodigy and Seasoned Pyromancer in 4 of 12 traced games where
+                    // she was drawn first, and never cast her. A card is now unplayable only when it
+                    // is more than two land drops away, and mana rocks count towards the mana.
+                    numLandsAvailable += 2 + CardLists.count(player.getCardsIn(ZoneType.Battlefield),
+                            c -> !c.isLand() && !c.isCreature() && !c.getManaAbilities().isEmpty());
+                }
 
                 // Discard unplayable card (checks by CMC)
                 // But check if there is a card in play that allows casting spells for free!
